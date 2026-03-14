@@ -8,6 +8,9 @@ const { initDatabase } = require('./src/config/database');
 
 const app = express();
 
+// Trust proxy for Render deployment
+app.set('trust proxy', true);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -22,7 +25,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://kelalbingo-admin.fly.dev',
-    /^https:\/\/.*\.fly\.dev$/
+    /^https:\/\/.*\.fly\.dev$/,
+    /^https:\/\/.*\.onrender\.com$/
   ],
   credentials: true
 }));
