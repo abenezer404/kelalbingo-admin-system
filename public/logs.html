@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Logs - KELALBINGO Admin</title>
+    <link rel="stylesheet" href="css/common.css">
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>KELALBINGO</h1>
+            <div class="admin-info">
+                <div id="adminName"></div>
+            </div>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="users.html">User Management</a></li>
+            <li><a href="packages.html">Balance Packages</a></li>
+            <li><a href="logs.html">Activity Logs</a></li>
+            <li><a href="change-password.html">Change Password</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <button id="logoutBtn" class="btn btn-secondary btn-block">Logout</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Activity Logs</h1>
+            <p>Monitor system activity and user actions</p>
+        </div>
+
+        <div class="section">
+            <h2>Password Reset Requests</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+                <input type="text" id="searchResetLogs" placeholder="Search by username or machine serial..."
+                    style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" />
+                <button id="refreshResetLogsBtn" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="resetLogsList"></div>
+        </div>
+
+        <div class="section">
+            <h2>Balance Sync Logs</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+                <input type="text" id="searchBalanceLogs" placeholder="Search by username or machine serial..."
+                    style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" />
+                <button id="refreshBalanceLogsBtn" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="balanceLogsList"></div>
+        </div>
+    </main>
+
+    <script src="js/admin.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/logs.js"></script>
+</body>
+
+</html>

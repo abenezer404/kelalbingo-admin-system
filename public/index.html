@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>KELALBINGO Admin Portal</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="login-box">
+            <h1>🎲 KELALBINGO</h1>
+            <h2>Admin Portal</h2>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="new-password">
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="loginBtn">Login</button>
+
+                <div id="error" class="error-message"></div>
+            </form>
+
+            <!-- OTP Verification Form (hidden initially) -->
+            <form id="otpForm" style="display: none;">
+                <div class="form-group">
+                    <label for="otpCode">Enter OTP Code</label>
+                    <input type="text" id="otpCode" name="otpCode" required maxlength="6" placeholder="000000"
+                        style="text-align: center; font-size: 24px; letter-spacing: 5px;">
+                    <small>Check your email for the 6-digit code</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="verifyBtn">Verify OTP</button>
+                <button type="button" class="btn btn-secondary" id="backBtn">Back to Login</button>
+
+                <div id="otpError" class="error-message"></div>
+                <div id="otpTimer" style="text-align: center; margin-top: 10px; color: #666;"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const otpForm = document.getElementById('otpForm');
+        const errorDiv = document.getElementById('error');
+        const otpErrorDiv = document.getElementById('otpError');
+        const otpTimerDiv = document.getElementById('otpTimer');
+
+        let currentUsername = '';
+        let otpExpiryTime = null;
+        let timerInterval = null;
+
+        // Clear form fields on page load (especially after logout)
+        window.addEventListener('load', () => {
+            clearFormFields();
+        });
+
+        // Also clear on DOMContentLoaded for faster clearing
+        document.addEventListener('DOMContentLoaded', () => {
+            clearFormFields();
+        });
+
+        // Clear fields function with multiple methods
+        function clearFormFields() {
+            const usernameField = document.getElementById('username');
+            const passwordField = document.getElementById('password');
+            const otpField = document.getElementById('otpCode');
+
+            // Method 1: Direct value clearing
+            if (usernameField) {
+                usernameField.value = '';
+                usernameField.defaultValue = '';
+            }
+            if (passwordField) {
+                passwordField.value = '';
+                passwordField.defaultValue = '';
+            }
+            if (otpField) {
+                otpField.value = '';
+                otpField.defaultValue = '';
+            }
+
+            // Method 2: Reset the entire form
+            const form = document.getElementById('loginForm');
+            if (form) {
+                form.reset();
+            }
+
+            // Method 3: Clear error messages
+            errorDiv.textContent = '';
+            if (otpErrorDiv) otpErrorDiv.textContent = '';
+
+            // Method 4: Force focus to prevent autofill
+            setTimeout(() => {
+                if (usernameField) {
+                    usernameField.focus();
+                    usernameField.value = '';
+                }
+            }, 100);
+
+            // Method 5: Additional clearing after a delay to override browser autofill
+            setTimeout(() => {
+                if (usernameField) usernameField.value = '';
+                if (passwordField) passwordField.value = '';
+                if (otpField) otpField.value = '';
+            }, 500);
+        }
+
+        // Show OTP form and hide login form
+        function showOTPForm(username, expiryTime) {
+            currentUsername = username;
+            otpExpiryTime = new Date(expiryTime);
+
+            loginForm.style.display = 'none';
+            otpForm.style.display = 'block';
+
+            document.getElementById('otpCode').focus();
+            startOTPTimer();
+        }
+
+        // Show login form and hide OTP form
+        function showLoginForm() {
+            loginForm.style.display = 'block';
+            otpForm.style.display = 'none';
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            document.getElementById('username').focus();
+        }
+
+        // Start OTP countdown timer
+        function startOTPTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const timeLeft = otpExpiryTime - now;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    otpTimerDiv.innerHTML = '<span style="color: red;">OTP expired. Please login again.</span>';
+                    setTimeout(() => {
+                        showLoginForm();
+                        clearFormFields();
+                    }, 3000);
+                } else {
+                    const minutes = Math.floor(timeLeft / 60000);
+                    const seconds = Math.floor((timeLeft % 60000) / 1000);
+                    otpTimerDiv.textContent = `OTP expires in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        // Login form submission
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorDiv.textContent = '';
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.requiresOTP) {
+                        // Show OTP form
+                        showOTPForm(data.username, data.expiresAt);
+                        errorDiv.innerHTML = '<span style="color: green;">✅ ' + data.message + '</span>';
+                    } else {
+                        // Direct login (OTP disabled)
+                        localStorage.setItem('adminToken', data.token);
+                        localStorage.setItem('adminUsername', data.username);
+                        window.location.href = 'dashboard.html';
+                    }
+                } else {
+                    errorDiv.textContent = data.message || 'Login failed';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+            }
+        });
+
+        // OTP form submission
+        if (otpForm) {
+            otpForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                otpErrorDiv.textContent = '';
+
+                const otpCode = document.getElementById('otpCode').value;
+
+                if (otpCode.length !== 6) {
+                    otpErrorDiv.textContent = 'Please enter a 6-digit OTP code';
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/admin/verify-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: currentUsername, otpCode })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        localStorage.setItem('adminToken', data.token);
+                        localStorage.setItem('adminUsername', data.username);
+
+                        if (timerInterval) {
+                            clearInterval(timerInterval);
+                        }
+
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        otpErrorDiv.textContent = data.message || 'OTP verification failed';
+
+                        // Clear OTP field for retry
+                        document.getElementById('otpCode').value = '';
+                        document.getElementById('otpCode').focus();
+                    }
+                } catch (error) {
+                    otpErrorDiv.textContent = 'Connection error. Please try again.';
+                }
+            });
+        }
+
+        // Back button
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                showLoginForm();
+                clearFormFields();
+            });
+        }
+
+        // Auto-format OTP input
+        const otpCodeInput = document.getElementById('otpCode');
+        if (otpCodeInput) {
+            otpCodeInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').substring(0, 6);
+            });
+        }
+    </script>
+</body>
+
+</html>
