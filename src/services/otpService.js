@@ -19,7 +19,7 @@ class OTPService {
       const recentOTP = await this.getRecentOTP(username);
       if (recentOTP) {
         const timeDiff = (Date.now() - new Date(recentOTP.created_at).getTime()) / 1000;
-        if (timeDiff < 60) { // 1 minute cooldown
+        if (timeDiff < 30) { // 30 second cooldown (reduced from 60)
           throw new Error('Please wait before requesting a new OTP');
         }
       }

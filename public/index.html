@@ -175,6 +175,11 @@
 
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+
+            // Disable button and show loading state
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
 
             try {
                 const response = await fetch('/admin/login', {
@@ -200,8 +205,17 @@
                     errorDiv.textContent = data.message || 'Login failed';
                 }
             } catch (error) {
-                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.textContent = 'Network error. Please try again.';
+            } finally {
+                // Re-enable button and restore text
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
             }
+        });
+                }
+            } catch (error) {
+            errorDiv.textContent = 'Connection error. Please try again.';
+        }
         });
 
         // OTP form submission
