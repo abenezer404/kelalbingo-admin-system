@@ -65,7 +65,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     }
 
     try {
-        const response = await fetch(`http://localhost:3000${endpoint}`, options);
+        const response = await fetch(`${endpoint}`, options);
         
         // Handle authentication errors
         if (response.status === 401 || response.status === 403) {
@@ -163,7 +163,7 @@ async function initActivityTracking() {
 // Load session configuration from server
 async function loadSessionConfig() {
     try {
-        const response = await fetch('http://localhost:3000/admin/session-config');
+        const response = await fetch('/admin/session-config');
         const data = await response.json();
         
         if (data.success) {
