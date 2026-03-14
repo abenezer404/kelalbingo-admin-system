@@ -1,145 +1,65 @@
-# 🎯 KELALBINGO Admin System
+# � KELALBINGO Admin System
 
-A secure, professional web-based administration system for the KELALBINGO gaming platform.
+## 🐳 Docker Deployment (Recommended)
 
-## ✨ Features
+### **Quick Start:**
+1. **Install Docker Desktop** from [docker.com](https://www.docker.com/products/docker-desktop/)
+2. **Start Docker Desktop** application
+3. **Double-click** `docker-start.bat`
+4. **Access** http://localhost:3000
 
-- 🔐 **Secure Authentication** with 2FA (Email OTP)
-- 👥 **User Management** with machine binding security
-- 💰 **Balance & Package Management** with audit trails
-- 📱 **Responsive Design** for mobile and desktop
-- ⏰ **Auto-logout** after 15 minutes of inactivity
-- 🎨 **Professional UI** with modal dialogs
-- 📊 **Real-time Statistics** and monitoring
-- 🔒 **Enterprise Security** with bcrypt password hashing
+### **Login Credentials:**
+- **Username**: `kelalbingo_admin`
+- **Password**: `KelalBingo@Admin2026!`
+- **2FA Email**: `ebenezerandualem953@gmail.com`
 
-## 🚀 Quick Deploy to Free Hosting
+### **Management:**
+- **Start**: `docker-start.bat`
+- **Stop**: `docker-stop.bat`
+- **Logs**: `docker-logs.bat`
 
-### 1. Setup for Deployment
-```bash
-npm run deploy-setup
-```
-This generates secure secrets and deployment files.
+## � Features
 
-### 2. Choose Free Hosting Platform
+### **User Management:**
+- Create users with machine binding
+- Manage user balances
+- View user activity logs
 
-#### **Render.com (Recommended)**
-- ✅ Always-on (no sleep)
-- ✅ 750 hours/month free
-- ✅ Automatic HTTPS
-- ✅ Custom domains
+### **Package System:**
+- Create balance packages
+- Track package purchases
+- Manage pricing
 
-#### **Railway**
-- ✅ $5 free credit monthly
-- ✅ Excellent performance
-- ✅ Easy deployment
+### **Security:**
+- 2FA authentication
+- Auto-logout (15 minutes)
+- Password change functionality
+- Session management
 
-#### **Cyclic**
-- ✅ Completely free
-- ✅ Good uptime
-- ✅ Simple setup
+## 📊 System Information
 
-### 3. Deploy Steps
-1. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Ready for deployment"
-   git push origin main
-   ```
+- **Port**: 3000 (http://localhost:3000)
+- **Database**: SQLite (`./database/admin.db`)
+- **Logs**: `./logs/` directory
+- **Health Check**: http://localhost:3000/health
 
-2. **Connect Repository** to your chosen hosting platform
+## 🛠️ Troubleshooting
 
-3. **Set Environment Variables** (copy from `.env.deploy`)
+### **Container Won't Start:**
+- Ensure Docker Desktop is running
+- Check port 3000 is available
+- Run `docker-logs.bat` for details
 
-4. **Deploy** and access your admin panel!
+### **Can't Access Admin Panel:**
+- Verify container is running: `docker ps`
+- Try http://127.0.0.1:3000
+- Check Windows Firewall settings
 
-## 📚 Documentation
-
-- **[FREE_HOSTING_DEPLOYMENT.md](FREE_HOSTING_DEPLOYMENT.md)** - Complete deployment guide
-- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Step-by-step checklist
-- **[AUTO_LOGOUT_SYSTEM.md](AUTO_LOGOUT_SYSTEM.md)** - Security features
-- **[ADMIN_MODAL_SYSTEM.md](ADMIN_MODAL_SYSTEM.md)** - UI components
-
-## 🔧 Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Access admin panel
-http://localhost:3000
-```
-
-## 🔐 Security Features
-
-- **Password Hashing** with bcrypt
-- **JWT Authentication** with secure tokens
-- **2FA Email OTP** verification
-- **Session Management** with auto-logout
-- **Machine Binding** for device security
-- **Input Validation** and XSS protection
-- **Audit Logging** for all admin actions
-
-## 📱 Admin Panel Features
-
-### Dashboard
-- Real-time user statistics
-- System health monitoring
-- Recent activity logs
-
-### User Management
-- Create/delete users with machine binding
-- Password reset functionality
-- User activity tracking
-
-### Balance Management
-- Package assignment system
-- Balance adjustments with audit trails
-- Transaction history
-
-### Security
-- Change admin password with 2FA
-- Session monitoring
-- Activity logging
-
-## 🆓 Free Hosting Ready
-
-This system is optimized for free hosting platforms:
-- **Zero configuration** deployment
-- **SQLite database** (no external DB needed)
-- **Minimal resource usage**
-- **Production-ready** security
-
-## 🎯 Perfect For
-
-- **Gaming platforms** user management
-- **Small businesses** admin panels
-- **Startups** with budget constraints
-- **Learning projects** with real-world features
-- **Proof of concepts** with professional UI
-
-## 🏆 Production Grade
-
-Despite being free-hosting ready, this system includes:
-- Enterprise-level security
-- Professional user interface
-- Comprehensive audit trails
-- Mobile-responsive design
-- Real-time session management
-- Automated security features
-
-## 📞 Support
-
-1. **Check Documentation** - Comprehensive guides included
-2. **Review Logs** - Check hosting platform logs
-3. **Test Locally** - Verify functionality locally first
-4. **Follow Checklist** - Use DEPLOYMENT_CHECKLIST.md
+### **Login Issues:**
+- Use correct credentials above
+- Check email for OTP code
+- Ensure internet connection for 2FA
 
 ---
 
-**🎉 Deploy your professional admin system for FREE today!**
-
-Built with ❤️ for the KELALBINGO gaming platform.
+**🎯 Professional admin system for KELALBINGO!**

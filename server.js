@@ -18,7 +18,14 @@ app.use(helmet({
     },
   },
 }));
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://kelalbingo-admin.fly.dev',
+    /^https:\/\/.*\.fly\.dev$/
+  ],
+  credentials: true
+}));
 
 // Rate limiting - more lenient for admin routes
 const apiLimiter = rateLimit({
@@ -88,7 +95,7 @@ app.use((err, req, res, next) => {
 // Initialize database and start server
 initDatabase()
   .then(() => {
-    app.listen(config.port, () => {
+    app.listen(config.port, '0.0.0.0', () => {
       // Server started successfully - no console output in production
     });
   })

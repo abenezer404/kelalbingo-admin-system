@@ -1,49 +1,36 @@
 version: '3.8'
 
 services:
-  bingo-admin:
+  kelalbingo-admin:
     build: .
-    container_name: bingo-admin-server
-    restart: unless-stopped
+    container_name: kelalbingo-admin
     ports:
-      - "3000:3000"
+      - "0.0.0.0:3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-    env_file:
-      - .env
+      - JWT_SECRET=aeaf5227b0b4bbce5dece4faa4dc68ddb620cdc56e444bf51c06d6a908e1b14bc82eb13341c6dd469a04657534a0cad3a0720f092006cf0f8ef819e3dac50a2c
+      - API_KEY=kelalbingo-secret-key-2026-secure
+      - ADMIN_USERNAME=kelalbingo_admin
+      - ADMIN_PASSWORD_HASH=$$2b$$10$$yZTXX0.HSMob/CPaQnnK8e0DPsGn5fEDt7.zxZNHMLPsdz0q7v6rG
+      - ADMIN_EMAIL=ebenezerandualem953@gmail.com
+      - DATABASE_PATH=./database/admin.db
+      - EMAIL_ENABLED=true
+      - EMAIL_SERVICE=gmail
+      - EMAIL_USER=ebenezerandualem953@gmail.com
+      - EMAIL_PASSWORD=wtao opnd jkje glsk
+      - SESSION_TIMEOUT_MINUTES=15
+      - SESSION_WARNING_MINUTES=2
+      - OTP_ENABLED=true
+      - OTP_EXPIRY_MINUTES=5
+      - OTP_MAX_ATTEMPTS=3
     volumes:
       - ./database:/app/database
       - ./logs:/app/logs
-    networks:
-      - bingo-network
-    healthcheck:
-      test: ["CMD", "node", "healthcheck.js"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  nginx:
-    image: nginx:alpine
-    container_name: bingo-nginx
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/ssl:ro
-      - ./logs/nginx:/var/log/nginx
-    depends_on:
-      - bingo-admin
     networks:
-      - bingo-network
+      - kelalbingo-network
 
 networks:
-  bingo-network:
+  kelalbingo-network:
     driver: bridge
-
-volumes:
-  database:
-  logs:
