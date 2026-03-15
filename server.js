@@ -9,7 +9,7 @@ const databaseService = require('./src/services/databaseService');
 const app = express();
 
 // Trust proxy for Render deployment
-app.set('trust proxy', true);
+app.set('trust proxy', 1); // Trust first proxy (Render's load balancer)
 
 // Security middleware
 app.use(helmet({
@@ -31,18 +31,23 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting - more lenient for admin routes
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // max 50 requests per window for API
-  message: 'Too many API requests, please try again later'
-});
+// Disable rate limiting temporarily to fix proxy issues
+// TODO: Re-enable with proper configuration
+// const apiLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 50,
+//   message: 'Too many API requests, please try again later'
+// });
 
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // max 200 requests per window for admin dashboard
-  message: 'Too many requests, please try again later'
-});
+// const adminLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 200,
+//   message: 'Too many requests, please try again later'
+// });
+
+// Placeholder middleware (no rate limiting)
+const apiLimiter = (req, res, next) => next();
+const adminLimiter = (req, res, next) => next();
 
 // Body parser
 app.use(express.json());

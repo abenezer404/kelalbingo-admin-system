@@ -3,19 +3,100 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 
-// Ensure database directory exists
-const dbDir = path.dirname(config.databasePath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+let db;
+let isPostgres = false;
 
-// Create database connection
-const db = new sqlite3.Database(config.databasePath, (err) => {
-  if (err) {
-    // Database connection error - handled silently in production
+// Check if PostgreSQL is configured
+if (process.env.DATABASE_URL) {
+  // Use PostgreSQL
+  const { Pool } = require('pg');
+  isPostgres = true;
+  
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+  
+  // Create a SQLite-compatible interface for PostgreSQL
+  db = {
+    // Simulate SQLite's db.get method
+    get: (sql, params, callback) => {
+      // Convert ? to $1, $2, etc. for PostgreSQL
+      let pgSql = sql;
+      let pgParams = params || [];
+      
+      if (params && params.length > 0) {
+        for (let i = 0; i < params.length; i++) {
+          pgSql = pgSql.replace('?', `$${i + 1}`);
+        }
+      }
+      
+      pool.query(pgSql, pgParams)
+        .then(result => callback(null, result.rows[0] || null))
+        .catch(err => callback(err));
+    },
+    
+    // Simulate SQLite's db.all method
+    all: (sql, params, callback) => {
+      let pgSql = sql;
+      let pgParams = params || [];
+      
+      if (params && params.length > 0) {
+        for (let i = 0; i < params.length; i++) {
+          pgSql = pgSql.replace('?', `$${i + 1}`);
+        }
+      }
+      
+      pool.query(pgSql, pgParams)
+        .then(result => callback(null, result.rows))
+        .catch(err => callback(err));
+    },
+    
+    // Simulate SQLite's db.run method
+    run: (sql, params, callback) => {
+      let pgSql = sql;
+      let pgParams = params || [];
+      
+      if (params && params.length > 0) {
+        for (let i = 0; i < params.length; i++) {
+          pgSql = pgSql.replace('?', `$${i + 1}`);
+        }
+      }
+      
+      pool.query(pgSql, pgParams)
+        .then(result => {
+          if (callback) {
+            callback.call({ 
+              lastID: result.rows[0]?.id, 
+              changes: result.rowCount 
+            });
+          }
+        })
+        .catch(err => {
+          if (callback) callback(err);
+        });
+    },
+    
+    serialize: (callback) => {
+      if (callback) callback();
+    }
+  };
+} else {
+  // Use SQLite
+  // Ensure database directory exists
+  const dbDir = path.dirname(config.databasePath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
-  // Database connected successfully - no console output in production
-});
+
+  // Create database connection
+  db = new sqlite3.Database(config.databasePath, (err) => {
+    if (err) {
+      // Database connection error - handled silently in production
+    }
+    // Database connected successfully - no console output in production
+  });
+}
 
 // Initialize database tables
 const initDatabase = () => {
