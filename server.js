@@ -98,19 +98,35 @@ app.use((err, req, res, next) => {
 });
 
 // Initialize database and start server
-databaseService.init()
-  .then(() => {
+async function startServer() {
+  try {
+    // Step 1: Initialize database schema
+    if (process.env.DATABASE_URL) {
+      console.log('🐘 Using PostgreSQL database...');
+      await databaseService.init();
+    } else {
+      console.log('📊 Using SQLite database...');
+      const { initDatabase } = require('./src/config/database');
+      await initDatabase();
+      await databaseService.init();
+    }
+    
     console.log('📊 Database initialized successfully');
-    return databaseService.initializeDefaultData();
-  })
-  .then(() => {
+    
+    // Step 2: Initialize default data
+    await databaseService.initializeDefaultData();
+    
+    // Step 3: Start server
     app.listen(config.port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${config.port}`);
       console.log(`🌐 Admin panel: http://localhost:${config.port}`);
       console.log(`💾 Database: ${process.env.DATABASE_URL ? 'PostgreSQL (Persistent)' : 'SQLite (Development)'}`);
     });
-  })
-  .catch((err) => {
+    
+  } catch (err) {
     console.error('❌ Startup error:', err);
     process.exit(1);
-  });
+  }
+}
+
+startServer();

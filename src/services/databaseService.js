@@ -10,7 +10,6 @@ class DatabaseService {
     if (!this.initialized) {
       await this.db.init();
       this.initialized = true;
-      console.log(`📊 Database initialized: ${this.db.isPostgres ? 'PostgreSQL' : 'SQLite'}`);
     }
     return this.db;
   }

@@ -190,7 +190,7 @@ class DatabaseAdapter {
     if (this.isPostgres) {
       this.client = await initPostgresDatabase();
     } else {
-      // Use existing SQLite setup
+      // SQLite is already initialized by server.js
       const { db } = require('./database');
       this.client = db;
     }
