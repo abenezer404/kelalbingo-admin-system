@@ -77,6 +77,38 @@ router.post('/debug-validate', validateApiKey, async (req, res) => {
             const device = await databaseService.getAuthorizedDevice(deviceSerial);
             steps.push(`5. Device query result: ${device ? 'found' : 'not found'}`);
             
+            if (device) {
+                // Test updateDeviceAccess
+                try {
+                    steps.push('6. Testing updateDeviceAccess...');
+                    await databaseService.updateDeviceAccess(deviceSerial, null);
+                    steps.push('7. updateDeviceAccess successful');
+                } catch (updateError) {
+                    steps.push(`6. updateDeviceAccess failed: ${updateError.message}`);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'updateDeviceAccess failed',
+                        error: updateError.message,
+                        steps
+                    });
+                }
+
+                // Test logDeviceAccess
+                try {
+                    steps.push('8. Testing logDeviceAccess...');
+                    await databaseService.logDeviceAccess(deviceSerial, null, true, 'Debug test access');
+                    steps.push('9. logDeviceAccess successful');
+                } catch (logError) {
+                    steps.push(`8. logDeviceAccess failed: ${logError.message}`);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'logDeviceAccess failed',
+                        error: logError.message,
+                        steps
+                    });
+                }
+            }
+            
             return res.json({
                 success: true,
                 message: 'Debug validation completed',
