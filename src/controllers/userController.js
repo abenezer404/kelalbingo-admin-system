@@ -305,16 +305,19 @@ const deleteUser = async (req, res) => {
  */
 const getStats = async (req, res) => {
   try {
+    console.log('Getting stats...');
     const stats = await User.getStats();
+    console.log('Stats retrieved:', stats);
     res.json({
       success: true,
       stats
     });
   } catch (error) {
-    // Get stats error - handled by response
+    console.error('Stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

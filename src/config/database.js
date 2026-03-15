@@ -25,15 +25,27 @@ if (process.env.DATABASE_URL) {
       let pgSql = sql;
       let pgParams = params || [];
       
+      // Convert SQLite boolean syntax to PostgreSQL
+      pgSql = pgSql.replace(/= 1/g, '= true').replace(/= 0/g, '= false');
+      
       if (params && params.length > 0) {
         for (let i = 0; i < params.length; i++) {
           pgSql = pgSql.replace('?', `$${i + 1}`);
+          // Convert boolean parameters
+          if (pgParams[i] === 1) pgParams[i] = true;
+          if (pgParams[i] === 0) pgParams[i] = false;
         }
       }
       
       pool.query(pgSql, pgParams)
-        .then(result => callback(null, result.rows[0] || null))
-        .catch(err => callback(err));
+        .then(result => {
+          console.log('PostgreSQL query success:', pgSql, pgParams, result.rows[0]);
+          callback(null, result.rows[0] || null);
+        })
+        .catch(err => {
+          console.error('PostgreSQL query error:', pgSql, pgParams, err);
+          callback(err);
+        });
     },
     
     // Simulate SQLite's db.all method
@@ -41,9 +53,15 @@ if (process.env.DATABASE_URL) {
       let pgSql = sql;
       let pgParams = params || [];
       
+      // Convert SQLite boolean syntax to PostgreSQL
+      pgSql = pgSql.replace(/= 1/g, '= true').replace(/= 0/g, '= false');
+      
       if (params && params.length > 0) {
         for (let i = 0; i < params.length; i++) {
           pgSql = pgSql.replace('?', `$${i + 1}`);
+          // Convert boolean parameters
+          if (pgParams[i] === 1) pgParams[i] = true;
+          if (pgParams[i] === 0) pgParams[i] = false;
         }
       }
       
@@ -57,9 +75,15 @@ if (process.env.DATABASE_URL) {
       let pgSql = sql;
       let pgParams = params || [];
       
+      // Convert SQLite boolean syntax to PostgreSQL
+      pgSql = pgSql.replace(/= 1/g, '= true').replace(/= 0/g, '= false');
+      
       if (params && params.length > 0) {
         for (let i = 0; i < params.length; i++) {
           pgSql = pgSql.replace('?', `$${i + 1}`);
+          // Convert boolean parameters
+          if (pgParams[i] === 1) pgParams[i] = true;
+          if (pgParams[i] === 0) pgParams[i] = false;
         }
       }
       
