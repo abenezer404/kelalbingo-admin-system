@@ -158,7 +158,7 @@
             };
 
             try {
-                const response = await apiRequest('/api/add-device', 'POST', formData);
+                const response = await apiRequest('/admin/devices/add', 'POST', formData);
 
                 if (response.success) {
                     showNotification('Device added successfully', 'success');
@@ -176,7 +176,7 @@
         // Load devices
         async function loadDevices() {
             try {
-                const response = await apiRequest('/api/devices');
+                const response = await apiRequest('/admin/devices');
 
                 if (response.success) {
                     displayDevices(response.devices);
@@ -223,7 +223,7 @@
             }
 
             try {
-                const response = await apiRequest(`/api/remove-device/${serial}`, 'DELETE');
+                const response = await apiRequest(`/admin/devices/${serial}`, 'DELETE');
 
                 if (response.success) {
                     showNotification('Device removed successfully', 'success');
@@ -239,7 +239,7 @@
         // Load access logs
         async function loadAccessLogs() {
             try {
-                const response = await apiRequest('/api/access-logs');
+                const response = await apiRequest('/admin/device-access-logs');
 
                 if (response.success) {
                     displayAccessLogs(response.logs);
