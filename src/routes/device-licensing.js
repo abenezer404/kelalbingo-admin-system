@@ -34,6 +34,78 @@ router.get('/test', (req, res) => {
 });
 
 /**
+ * Debug validation endpoint - step by step testing
+ */
+router.post('/debug-validate', validateApiKey, async (req, res) => {
+    const steps = [];
+    
+    try {
+        const { deviceSerial } = req.body;
+        steps.push('1. Received request');
+        
+        if (!deviceSerial) {
+            return res.status(400).json({
+                success: false,
+                message: 'Device serial is required',
+                steps
+            });
+        }
+        steps.push('2. Device serial validated');
+
+        // Test database service initialization
+        try {
+            if (!databaseService.initialized) {
+                steps.push('3. Initializing database service...');
+                await databaseService.init();
+                steps.push('4. Database service initialized');
+            } else {
+                steps.push('3. Database service already initialized');
+            }
+        } catch (initError) {
+            steps.push(`3. Database init failed: ${initError.message}`);
+            return res.status(500).json({
+                success: false,
+                message: 'Database initialization failed',
+                error: initError.message,
+                steps
+            });
+        }
+
+        // Test device query
+        try {
+            steps.push('4. Querying device...');
+            const device = await databaseService.getAuthorizedDevice(deviceSerial);
+            steps.push(`5. Device query result: ${device ? 'found' : 'not found'}`);
+            
+            return res.json({
+                success: true,
+                message: 'Debug validation completed',
+                deviceFound: !!device,
+                device: device,
+                steps
+            });
+        } catch (queryError) {
+            steps.push(`4. Device query failed: ${queryError.message}`);
+            return res.status(500).json({
+                success: false,
+                message: 'Device query failed',
+                error: queryError.message,
+                steps
+            });
+        }
+
+    } catch (error) {
+        steps.push(`Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Debug validation failed',
+            error: error.message,
+            steps
+        });
+    }
+});
+
+/**
  * Validate device authorization
  */
 router.post('/validate-device', validateApiKey, async (req, res) => {
