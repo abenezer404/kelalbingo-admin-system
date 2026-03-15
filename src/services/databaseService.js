@@ -53,11 +53,11 @@ class DatabaseService {
   // Package management
   async createPackage(name, amount, description) {
     if (this.db.isPostgres) {
-      const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES ($1, $2, $3, $4)';
+      const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES ($1, $2, $3, $4) RETURNING id';
       return await this.db.run(sql, [name, amount, description, true]);
     } else {
       const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES (?, ?, ?, ?)';
-      return await this.db.run(sql, [name, amount, description, true]);
+      return await this.db.run(sql, [name, amount, description, 1]);
     }
   }
 
@@ -67,7 +67,7 @@ class DatabaseService {
       return await this.db.query(sql, [true]);
     } else {
       const sql = 'SELECT * FROM packages WHERE is_active = ? ORDER BY amount ASC';
-      return await this.db.query(sql, [true]);
+      return await this.db.query(sql, [1]);
     }
   }
 
@@ -104,11 +104,19 @@ class DatabaseService {
 
   // Device management
   async addAuthorizedDevice(deviceSerial, deviceName, licenseType, expiresAt) {
-    const sql = `
-      INSERT INTO authorized_devices (device_serial, device_name, license_type, expires_at, is_active)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    return await this.db.run(sql, [deviceSerial, deviceName, licenseType, expiresAt, true]);
+    if (this.db.isPostgres) {
+      const sql = `
+        INSERT INTO authorized_devices (device_serial, device_name, license_type, expires_at, is_active)
+        VALUES ($1, $2, $3, $4, $5) RETURNING id
+      `;
+      return await this.db.run(sql, [deviceSerial, deviceName, licenseType, expiresAt, true]);
+    } else {
+      const sql = `
+        INSERT INTO authorized_devices (device_serial, device_name, license_type, expires_at, is_active)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      return await this.db.run(sql, [deviceSerial, deviceName, licenseType, expiresAt, 1]);
+    }
   }
 
   async getAuthorizedDevices() {
@@ -127,7 +135,7 @@ class DatabaseService {
       return await this.db.get(sql, [deviceSerial, true]);
     } else {
       const sql = 'SELECT * FROM authorized_devices WHERE device_serial = ? AND is_active = ?';
-      return await this.db.get(sql, [deviceSerial, true]);
+      return await this.db.get(sql, [deviceSerial, 1]);
     }
   }
 
@@ -141,16 +149,29 @@ class DatabaseService {
   }
 
   async removeDevice(deviceSerial) {
-    const sql = 'UPDATE authorized_devices SET is_active = ? WHERE device_serial = ?';
-    return await this.db.run(sql, [false, deviceSerial]);
+    if (this.db.isPostgres) {
+      const sql = 'UPDATE authorized_devices SET is_active = $1 WHERE device_serial = $2';
+      return await this.db.run(sql, [false, deviceSerial]);
+    } else {
+      const sql = 'UPDATE authorized_devices SET is_active = ? WHERE device_serial = ?';
+      return await this.db.run(sql, [0, deviceSerial]);
+    }
   }
 
   async logDeviceAccess(deviceSerial, deviceFingerprint, success, message) {
-    const sql = `
-      INSERT INTO device_access_logs (device_serial, device_fingerprint, success, message, accessed_at)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `;
-    return await this.db.run(sql, [deviceSerial, deviceFingerprint, success ? 1 : 0, message]);
+    if (this.db.isPostgres) {
+      const sql = `
+        INSERT INTO device_access_logs (device_serial, device_fingerprint, success, message, accessed_at)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+      `;
+      return await this.db.run(sql, [deviceSerial, deviceFingerprint, success, message]);
+    } else {
+      const sql = `
+        INSERT INTO device_access_logs (device_serial, device_fingerprint, success, message, accessed_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `;
+      return await this.db.run(sql, [deviceSerial, deviceFingerprint, success ? 1 : 0, message]);
+    }
   }
 
   async getDeviceAccessLogs(limit = 100) {
@@ -165,15 +186,27 @@ class DatabaseService {
 
   // Statistics
   async getStats() {
-    const userCount = await this.db.get('SELECT COUNT(*) as count FROM pending_users');
-    const packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [true]);
-    const deviceCount = await this.db.get('SELECT COUNT(*) as count FROM authorized_devices WHERE is_active = ?', [true]);
-    
-    return {
-      totalUsers: userCount?.count || 0,
-      totalPackages: packageCount?.count || 0,
-      totalDevices: deviceCount?.count || 0
-    };
+    if (this.db.isPostgres) {
+      const userCount = await this.db.get('SELECT COUNT(*) as count FROM pending_users');
+      const packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = $1', [true]);
+      const deviceCount = await this.db.get('SELECT COUNT(*) as count FROM authorized_devices WHERE is_active = $1', [true]);
+      
+      return {
+        totalUsers: userCount?.count || 0,
+        totalPackages: packageCount?.count || 0,
+        totalDevices: deviceCount?.count || 0
+      };
+    } else {
+      const userCount = await this.db.get('SELECT COUNT(*) as count FROM pending_users');
+      const packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [1]);
+      const deviceCount = await this.db.get('SELECT COUNT(*) as count FROM authorized_devices WHERE is_active = ?', [1]);
+      
+      return {
+        totalUsers: userCount?.count || 0,
+        totalPackages: packageCount?.count || 0,
+        totalDevices: deviceCount?.count || 0
+      };
+    }
   }
 
   // Initialize default data
@@ -185,7 +218,7 @@ class DatabaseService {
     if (this.db.isPostgres) {
       packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = $1', [true]);
     } else {
-      packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [true]);
+      packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [1]);
     }
     
     if (packageCount.count === 0) {

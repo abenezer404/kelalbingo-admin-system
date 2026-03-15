@@ -23,11 +23,24 @@ const validateApiKey = (req, res, next) => {
 };
 
 /**
+ * Test endpoint for debugging
+ */
+router.get('/test', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Device licensing API is working',
+        timestamp: new Date().toISOString()
+    });
+});
+
+/**
  * Validate device authorization
  */
 router.post('/validate-device', validateApiKey, async (req, res) => {
     try {
         const { deviceSerial, appVersion } = req.body;
+        
+        console.log(`🔍 Device validation request: ${deviceSerial}`);
         
         if (!deviceSerial) {
             return res.status(400).json({
@@ -36,11 +49,20 @@ router.post('/validate-device', validateApiKey, async (req, res) => {
             });
         }
 
+        // Initialize database service if not already done
+        if (!databaseService.initialized) {
+            console.log('🔄 Initializing database service...');
+            await databaseService.init();
+        }
+
         // Check if device is authorized
+        console.log(`🔍 Checking device authorization for: ${deviceSerial}`);
         const device = await databaseService.getAuthorizedDevice(deviceSerial);
+        console.log(`📋 Device query result:`, device);
 
         if (!device) {
             // Log unauthorized access attempt
+            console.log(`❌ Device not authorized: ${deviceSerial}`);
             await databaseService.logDeviceAccess(deviceSerial, null, false, 'Device not authorized');
             
             return res.json({
@@ -52,6 +74,7 @@ router.post('/validate-device', validateApiKey, async (req, res) => {
 
         // Check if license is expired
         if (device.expires_at && new Date() > new Date(device.expires_at)) {
+            console.log(`⏰ License expired for device: ${deviceSerial}`);
             return res.json({
                 success: true,
                 authorized: false,
@@ -60,10 +83,13 @@ router.post('/validate-device', validateApiKey, async (req, res) => {
         }
 
         // Update device access
+        console.log(`✅ Updating device access for: ${deviceSerial}`);
         await databaseService.updateDeviceAccess(deviceSerial, null);
 
         // Log successful access
         await databaseService.logDeviceAccess(deviceSerial, null, true, 'Access granted');
+
+        console.log(`🎉 Device authorized successfully: ${deviceSerial}`);
 
         // Return authorization success
         res.json({
@@ -75,10 +101,12 @@ router.post('/validate-device', validateApiKey, async (req, res) => {
             deviceName: device.device_name
         });
     } catch (error) {
-        console.error('Device validation error:', error);
+        console.error('💥 Device validation error:', error);
+        console.error('Stack trace:', error.stack);
         res.status(500).json({
             success: false,
-            message: 'Server error'
+            message: 'Server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
@@ -86,7 +114,7 @@ router.post('/validate-device', validateApiKey, async (req, res) => {
 /**
  * Add authorized device (admin only)
  */
-router.post('/add-device', validateApiKey, (req, res) => {
+router.post('/add-device', validateApiKey, async (req, res) => {
     try {
         const { deviceSerial, deviceName, licenseType, expiresAt } = req.body;
         
@@ -97,32 +125,26 @@ router.post('/add-device', validateApiKey, (req, res) => {
             });
         }
 
-        const sql = `
-            INSERT INTO authorized_devices (device_serial, device_name, license_type, expires_at, created_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `;
-        
-        db.run(sql, [deviceSerial, deviceName || 'Unknown Device', licenseType || 'standard', expiresAt], function(err) {
-            if (err) {
-                if (err.code === 'SQLITE_CONSTRAINT') {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Device already authorized'
-                    });
-                }
-                
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'Device authorized successfully',
-                deviceId: this.lastID
+        // Check if device already exists
+        const existingDevice = await databaseService.getAuthorizedDevice(deviceSerial);
+        if (existingDevice) {
+            return res.status(400).json({
+                success: false,
+                message: 'Device already authorized'
             });
+        }
+
+        const result = await databaseService.addAuthorizedDevice(
+            deviceSerial, 
+            deviceName || 'Unknown Device', 
+            licenseType || 'standard', 
+            expiresAt
+        );
+
+        res.json({
+            success: true,
+            message: 'Device authorized successfully',
+            deviceId: result.lastID || result.insertId
         });
     } catch (error) {
         console.error('Add device error:', error);
@@ -136,32 +158,22 @@ router.post('/add-device', validateApiKey, (req, res) => {
 /**
  * Remove device authorization (admin only)
  */
-router.delete('/remove-device/:serial', validateApiKey, (req, res) => {
+router.delete('/remove-device/:serial', validateApiKey, async (req, res) => {
     try {
         const { serial } = req.params;
         
-        const sql = `UPDATE authorized_devices SET is_active = 0 WHERE device_serial = ?`;
-        
-        db.run(sql, [serial], function(err) {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
+        const result = await databaseService.removeDevice(serial);
 
-            if (this.changes === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Device not found'
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'Device authorization removed'
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Device not found'
             });
+        }
+
+        res.json({
+            success: true,
+            message: 'Device authorization removed'
         });
     } catch (error) {
         console.error('Remove device error:', error);
@@ -175,28 +187,13 @@ router.delete('/remove-device/:serial', validateApiKey, (req, res) => {
 /**
  * List authorized devices (admin only)
  */
-router.get('/devices', validateApiKey, (req, res) => {
+router.get('/devices', validateApiKey, async (req, res) => {
     try {
-        const sql = `
-            SELECT device_serial, device_name, device_fingerprint, license_type, 
-                   expires_at, created_at, last_access, access_count, is_active
-            FROM authorized_devices 
-            ORDER BY created_at DESC
-        `;
-        
-        db.all(sql, [], (err, devices) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
+        const devices = await databaseService.getAuthorizedDevices();
 
-            res.json({
-                success: true,
-                devices: devices
-            });
+        res.json({
+            success: true,
+            devices: devices
         });
     } catch (error) {
         console.error('List devices error:', error);
@@ -210,28 +207,13 @@ router.get('/devices', validateApiKey, (req, res) => {
 /**
  * Get device access logs (admin only)
  */
-router.get('/access-logs', validateApiKey, (req, res) => {
+router.get('/access-logs', validateApiKey, async (req, res) => {
     try {
-        const sql = `
-            SELECT device_serial, device_fingerprint, success, message, accessed_at
-            FROM device_access_logs 
-            ORDER BY accessed_at DESC 
-            LIMIT 100
-        `;
-        
-        db.all(sql, [], (err, logs) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
+        const logs = await databaseService.getDeviceAccessLogs(100);
 
-            res.json({
-                success: true,
-                logs: logs
-            });
+        res.json({
+            success: true,
+            logs: logs
         });
     } catch (error) {
         console.error('Access logs error:', error);
@@ -243,19 +225,7 @@ router.get('/access-logs', validateApiKey, (req, res) => {
 });
 
 /**
- * Log device access attempts
+ * Log device access attempts - removed as it's now handled by databaseService
  */
-function logDeviceAccess(deviceSerial, deviceFingerprint, success, message) {
-    const sql = `
-        INSERT INTO device_access_logs (device_serial, device_fingerprint, success, message, accessed_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `;
-    
-    db.run(sql, [deviceSerial, deviceFingerprint || null, success ? 1 : 0, message], (err) => {
-        if (err) {
-            console.error('Failed to log device access:', err);
-        }
-    });
-}
 
 module.exports = router;

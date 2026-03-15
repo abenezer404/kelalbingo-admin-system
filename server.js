@@ -74,14 +74,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -90,6 +82,14 @@ app.get('/health', (req, res) => {
     uptime: Math.floor(process.uptime()),
     environment: config.nodeEnv,
     version: require('./package.json').version || '1.0.0'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
   });
 });
 

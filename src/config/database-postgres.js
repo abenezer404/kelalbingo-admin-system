@@ -219,7 +219,8 @@ class DatabaseAdapter {
     if (this.isPostgres) {
       const result = await this.client.query(sql, params);
       return { 
-        lastID: result.rows[0]?.id,
+        lastID: result.rows[0]?.id || result.insertId,
+        insertId: result.rows[0]?.id || result.insertId,
         changes: result.rowCount 
       };
     } else {
@@ -229,6 +230,7 @@ class DatabaseAdapter {
           if (err) reject(err);
           else resolve({ 
             lastID: this.lastID, 
+            insertId: this.lastID,
             changes: this.changes 
           });
         });
