@@ -565,23 +565,13 @@ function logPasswordChange(username, ipAddress, userAgent) {
  */
 const updateActivity = async (req, res) => {
   try {
-    const sessionId = req.cookies.adminSession;
-    const session = validateSession(sessionId);
-    
-    if (session) {
-      res.json({
-        success: true,
-        message: 'Activity updated',
-        expiresIn: SESSION_TIMEOUT,
-        timeoutMinutes: config.session.inactivityTimeoutMinutes
-      });
-    } else {
-      res.status(401).json({
-        success: false,
-        message: 'Session expired',
-        expired: true
-      });
-    }
+    // The JWT token is already verified by the verifyToken middleware
+    // So if we reach here, the user is authenticated
+    res.json({
+      success: true,
+      message: 'Activity updated',
+      timeoutMinutes: config.session.inactivityTimeoutMinutes || 15
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
