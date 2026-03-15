@@ -133,6 +133,38 @@ const initDatabase = () => {
         if (err) reject(err);
       });
 
+      // Create device licensing tables
+      db.run(`
+        CREATE TABLE IF NOT EXISTS authorized_devices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          device_serial TEXT UNIQUE NOT NULL,
+          device_name TEXT,
+          device_fingerprint TEXT,
+          license_type TEXT DEFAULT 'standard',
+          expires_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_access DATETIME,
+          access_count INTEGER DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1
+        )
+      `, (err) => {
+        if (err) reject(err);
+      });
+
+      // Create device access logs table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS device_access_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          device_serial TEXT NOT NULL,
+          device_fingerprint TEXT,
+          success BOOLEAN NOT NULL,
+          message TEXT,
+          accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `, (err) => {
+        if (err) reject(err);
+      });
+
       // Create balance_sync_logs table
       db.run(`
         CREATE TABLE IF NOT EXISTS balance_sync_logs (

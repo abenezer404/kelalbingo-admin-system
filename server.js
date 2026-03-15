@@ -50,6 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes (before static files to avoid conflicts)
 app.use('/api', apiLimiter, require('./src/routes/api'));
+app.use('/api', apiLimiter, require('./src/routes/device-licensing'));
 app.use('/admin', adminLimiter, require('./src/routes/admin'));
 
 // Serve static files (admin portal) with proper MIME types
