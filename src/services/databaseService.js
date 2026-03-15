@@ -52,13 +52,23 @@ class DatabaseService {
 
   // Package management
   async createPackage(name, amount, description) {
-    const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES (?, ?, ?, ?)';
-    return await this.db.run(sql, [name, amount, description, true]);
+    if (this.db.isPostgres) {
+      const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES ($1, $2, $3, $4)';
+      return await this.db.run(sql, [name, amount, description, true]);
+    } else {
+      const sql = 'INSERT INTO packages (name, amount, description, is_active) VALUES (?, ?, ?, ?)';
+      return await this.db.run(sql, [name, amount, description, true]);
+    }
   }
 
   async getAllPackages() {
-    const sql = 'SELECT * FROM packages WHERE is_active = ? ORDER BY amount ASC';
-    return await this.db.query(sql, [true]);
+    if (this.db.isPostgres) {
+      const sql = 'SELECT * FROM packages WHERE is_active = $1 ORDER BY amount ASC';
+      return await this.db.query(sql, [true]);
+    } else {
+      const sql = 'SELECT * FROM packages WHERE is_active = ? ORDER BY amount ASC';
+      return await this.db.query(sql, [true]);
+    }
   }
 
   async assignPackage(userId, packageId, amount, assignedBy) {
@@ -112,8 +122,13 @@ class DatabaseService {
   }
 
   async getAuthorizedDevice(deviceSerial) {
-    const sql = 'SELECT * FROM authorized_devices WHERE device_serial = ? AND is_active = ?';
-    return await this.db.get(sql, [deviceSerial, true]);
+    if (this.db.isPostgres) {
+      const sql = 'SELECT * FROM authorized_devices WHERE device_serial = $1 AND is_active = $2';
+      return await this.db.get(sql, [deviceSerial, true]);
+    } else {
+      const sql = 'SELECT * FROM authorized_devices WHERE device_serial = ? AND is_active = ?';
+      return await this.db.get(sql, [deviceSerial, true]);
+    }
   }
 
   async updateDeviceAccess(deviceSerial, deviceFingerprint = null) {
@@ -166,7 +181,12 @@ class DatabaseService {
     console.log('🔄 Initializing default data...');
     
     // Check and create default packages
-    const packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [true]);
+    let packageCount;
+    if (this.db.isPostgres) {
+      packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = $1', [true]);
+    } else {
+      packageCount = await this.db.get('SELECT COUNT(*) as count FROM packages WHERE is_active = ?', [true]);
+    }
     
     if (packageCount.count === 0) {
       console.log('📦 Creating default packages...');

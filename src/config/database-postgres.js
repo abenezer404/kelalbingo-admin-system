@@ -200,9 +200,8 @@ class DatabaseAdapter {
   // Unified query method
   async query(sql, params = []) {
     if (this.isPostgres) {
-      // Convert SQLite-style queries to PostgreSQL
-      const pgSql = this.convertSqlToPostgres(sql);
-      const result = await this.client.query(pgSql, params);
+      // Use PostgreSQL directly without conversion
+      const result = await this.client.query(sql, params);
       return result.rows;
     } else {
       // SQLite
@@ -218,8 +217,7 @@ class DatabaseAdapter {
   // Run a single query (INSERT, UPDATE, DELETE)
   async run(sql, params = []) {
     if (this.isPostgres) {
-      const pgSql = this.convertSqlToPostgres(sql);
-      const result = await this.client.query(pgSql, params);
+      const result = await this.client.query(sql, params);
       return { 
         lastID: result.rows[0]?.id,
         changes: result.rowCount 
@@ -241,8 +239,7 @@ class DatabaseAdapter {
   // Get a single row
   async get(sql, params = []) {
     if (this.isPostgres) {
-      const pgSql = this.convertSqlToPostgres(sql);
-      const result = await this.client.query(pgSql, params);
+      const result = await this.client.query(sql, params);
       return result.rows[0] || null;
     } else {
       // SQLite
@@ -255,16 +252,6 @@ class DatabaseAdapter {
     }
   }
 
-  // Convert SQLite queries to PostgreSQL compatible queries
-  convertSqlToPostgres(sql) {
-    return sql
-      .replace(/AUTOINCREMENT/gi, '')
-      .replace(/INTEGER PRIMARY KEY/gi, 'SERIAL PRIMARY KEY')
-      .replace(/DATETIME DEFAULT CURRENT_TIMESTAMP/gi, 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
-      .replace(/BOOLEAN DEFAULT 0/gi, 'BOOLEAN DEFAULT FALSE')
-      .replace(/BOOLEAN DEFAULT 1/gi, 'BOOLEAN DEFAULT TRUE')
-      .replace(/REAL/gi, 'DECIMAL');
-  }
 }
 
 module.exports = {
