@@ -4,8 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const config = require('./src/config/config');
-const { initDatabase } = require('./src/config/database');
-const { initializeEssentialData } = require('./src/utils/initializeData');
+const databaseService = require('./src/services/databaseService');
 
 const app = express();
 
@@ -99,15 +98,16 @@ app.use((err, req, res, next) => {
 });
 
 // Initialize database and start server
-initDatabase()
+databaseService.init()
   .then(() => {
     console.log('📊 Database initialized successfully');
-    return initializeEssentialData();
+    return databaseService.initializeDefaultData();
   })
   .then(() => {
     app.listen(config.port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${config.port}`);
       console.log(`🌐 Admin panel: http://localhost:${config.port}`);
+      console.log(`💾 Database: ${process.env.DATABASE_URL ? 'PostgreSQL (Persistent)' : 'SQLite (Development)'}`);
     });
   })
   .catch((err) => {

@@ -4,7 +4,7 @@ const verifyToken = require('../middleware/auth');
 const { login, verifyOTP, changePassword, requestPasswordChangeOTP, updateActivity, getSessionConfig } = require('../controllers/authController');
 const { createUser, listUsers, deleteUser, getStats, updateUserPassword, getPasswordResetLogs } = require('../controllers/userController');
 const { getPackages, assignPackage, getUserPackages, getBalanceSyncLogs, getPackageAssignments, adjustBalance, cancelPendingPackage } = require('../controllers/packageController');
-const { db } = require('../config/database');
+const databaseService = require('../services/databaseService');
 
 // Public routes
 router.post('/login', login);
@@ -36,28 +36,12 @@ router.post('/balance/adjust', verifyToken, adjustBalance);
 router.post('/packages/cancel', verifyToken, cancelPendingPackage);
 
 // Device Management routes (admin only)
-router.get('/devices', verifyToken, (req, res) => {
+router.get('/devices', verifyToken, async (req, res) => {
     try {
-        const sql = `
-            SELECT device_serial, device_name, device_fingerprint, license_type, 
-                   expires_at, created_at, last_access, access_count, is_active
-            FROM authorized_devices 
-            ORDER BY created_at DESC
-        `;
-        
-        db.all(sql, [], (err, devices) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
-
-            res.json({
-                success: true,
-                devices: devices
-            });
+        const devices = await databaseService.getAuthorizedDevices();
+        res.json({
+            success: true,
+            devices: devices
         });
     } catch (error) {
         console.error('List devices error:', error);
@@ -68,7 +52,7 @@ router.get('/devices', verifyToken, (req, res) => {
     }
 });
 
-router.post('/devices/add', verifyToken, (req, res) => {
+router.post('/devices/add', verifyToken, async (req, res) => {
     try {
         const { deviceSerial, deviceName, licenseType, expiresAt } = req.body;
         
@@ -79,32 +63,26 @@ router.post('/devices/add', verifyToken, (req, res) => {
             });
         }
 
-        const sql = `
-            INSERT INTO authorized_devices (device_serial, device_name, license_type, expires_at, created_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `;
-        
-        db.run(sql, [deviceSerial, deviceName || 'Unknown Device', licenseType || 'standard', expiresAt], function(err) {
-            if (err) {
-                if (err.code === 'SQLITE_CONSTRAINT') {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Device already authorized'
-                    });
-                }
-                
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'Device authorized successfully',
-                deviceId: this.lastID
+        // Check if device already exists
+        const existing = await databaseService.getAuthorizedDevice(deviceSerial);
+        if (existing) {
+            return res.status(400).json({
+                success: false,
+                message: 'Device already authorized'
             });
+        }
+
+        const result = await databaseService.addAuthorizedDevice(
+            deviceSerial,
+            deviceName || 'Unknown Device',
+            licenseType || 'standard',
+            expiresAt
+        );
+
+        res.json({
+            success: true,
+            message: 'Device authorized successfully',
+            deviceId: result.lastID
         });
     } catch (error) {
         console.error('Add device error:', error);
@@ -115,32 +93,22 @@ router.post('/devices/add', verifyToken, (req, res) => {
     }
 });
 
-router.delete('/devices/:serial', verifyToken, (req, res) => {
+router.delete('/devices/:serial', verifyToken, async (req, res) => {
     try {
         const { serial } = req.params;
         
-        const sql = `UPDATE authorized_devices SET is_active = 0 WHERE device_serial = ?`;
-        
-        db.run(sql, [serial], function(err) {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
+        const result = await databaseService.removeDevice(serial);
 
-            if (this.changes === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Device not found'
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'Device authorization removed'
+        if (result.changes === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Device not found'
             });
+        }
+
+        res.json({
+            success: true,
+            message: 'Device authorization removed'
         });
     } catch (error) {
         console.error('Remove device error:', error);
@@ -151,28 +119,12 @@ router.delete('/devices/:serial', verifyToken, (req, res) => {
     }
 });
 
-router.get('/device-access-logs', verifyToken, (req, res) => {
+router.get('/device-access-logs', verifyToken, async (req, res) => {
     try {
-        const sql = `
-            SELECT device_serial, device_fingerprint, success, message, accessed_at
-            FROM device_access_logs 
-            ORDER BY accessed_at DESC 
-            LIMIT 100
-        `;
-        
-        db.all(sql, [], (err, logs) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
-
-            res.json({
-                success: true,
-                logs: logs
-            });
+        const logs = await databaseService.getDeviceAccessLogs(100);
+        res.json({
+            success: true,
+            logs: logs
         });
     } catch (error) {
         console.error('Access logs error:', error);

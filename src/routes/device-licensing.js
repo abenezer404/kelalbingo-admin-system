@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../config/database');
+const databaseService = require('../services/databaseService');
 
 /**
  * Device Licensing API Routes
@@ -25,7 +25,7 @@ const validateApiKey = (req, res, next) => {
 /**
  * Validate device authorization
  */
-router.post('/validate-device', validateApiKey, (req, res) => {
+router.post('/validate-device', validateApiKey, async (req, res) => {
     try {
         const { deviceSerial, appVersion } = req.body;
         
@@ -37,65 +37,42 @@ router.post('/validate-device', validateApiKey, (req, res) => {
         }
 
         // Check if device is authorized
-        const sql = `
-            SELECT * FROM authorized_devices 
-            WHERE device_serial = ? AND is_active = 1
-        `;
-        
-        db.get(sql, [deviceSerial], (err, device) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            }
+        const device = await databaseService.getAuthorizedDevice(deviceSerial);
 
-            if (!device) {
-                // Log unauthorized access attempt
-                logDeviceAccess(deviceSerial, null, false, 'Device not authorized');
-                
-                return res.json({
-                    success: true,
-                    authorized: false,
-                    message: 'Device not authorized'
-                });
-            }
-
-            // Check if license is expired
-            if (device.expires_at && new Date() > new Date(device.expires_at)) {
-                return res.json({
-                    success: true,
-                    authorized: false,
-                    message: 'License expired'
-                });
-            }
-
-            // Update last access
-            const updateSql = `
-                UPDATE authorized_devices 
-                SET last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
-                WHERE device_serial = ?
-            `;
+        if (!device) {
+            // Log unauthorized access attempt
+            await databaseService.logDeviceAccess(deviceSerial, null, false, 'Device not authorized');
             
-            db.run(updateSql, [deviceSerial], (updateErr) => {
-                if (updateErr) {
-                    console.error('Failed to update device access:', updateErr);
-                }
-            });
-
-            // Log successful access
-            logDeviceAccess(deviceSerial, null, true, 'Access granted');
-
-            // Return authorization success
-            res.json({
+            return res.json({
                 success: true,
-                authorized: true,
-                message: 'Device authorized',
-                expiresAt: device.expires_at,
-                licenseType: device.license_type || 'standard',
-                deviceName: device.device_name
+                authorized: false,
+                message: 'Device not authorized'
             });
+        }
+
+        // Check if license is expired
+        if (device.expires_at && new Date() > new Date(device.expires_at)) {
+            return res.json({
+                success: true,
+                authorized: false,
+                message: 'License expired'
+            });
+        }
+
+        // Update device access
+        await databaseService.updateDeviceAccess(deviceSerial, null);
+
+        // Log successful access
+        await databaseService.logDeviceAccess(deviceSerial, null, true, 'Access granted');
+
+        // Return authorization success
+        res.json({
+            success: true,
+            authorized: true,
+            message: 'Device authorized',
+            expiresAt: device.expires_at,
+            licenseType: device.license_type || 'standard',
+            deviceName: device.device_name
         });
     } catch (error) {
         console.error('Device validation error:', error);
