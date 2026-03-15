@@ -23,6 +23,69 @@ const validateApiKey = (req, res, next) => {
 };
 
 /**
+ * Simple database test endpoint
+ */
+router.post('/test-db', validateApiKey, async (req, res) => {
+    try {
+        // Test a simple update query
+        const testSerial = 'C949V62';
+        
+        // Initialize database service
+        if (!databaseService.initialized) {
+            await databaseService.init();
+        }
+
+        // Test the exact SQL query that's failing
+        const isPostgres = databaseService.db.isPostgres;
+        
+        if (isPostgres) {
+            const sql = `
+                UPDATE authorized_devices 
+                SET device_fingerprint = $1, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
+                WHERE device_serial = $2
+            `;
+            console.log('Testing PostgreSQL query:', sql);
+            console.log('Parameters:', [null, testSerial]);
+            
+            const result = await databaseService.db.run(sql, [null, testSerial]);
+            
+            res.json({
+                success: true,
+                message: 'PostgreSQL update test successful',
+                result: result,
+                isPostgres: true
+            });
+        } else {
+            const sql = `
+                UPDATE authorized_devices 
+                SET device_fingerprint = ?, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
+                WHERE device_serial = ?
+            `;
+            console.log('Testing SQLite query:', sql);
+            console.log('Parameters:', [null, testSerial]);
+            
+            const result = await databaseService.db.run(sql, [null, testSerial]);
+            
+            res.json({
+                success: true,
+                message: 'SQLite update test successful',
+                result: result,
+                isPostgres: false
+            });
+        }
+
+    } catch (error) {
+        console.error('Database test error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Database test failed',
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
+
+/**
  * Test endpoint for debugging
  */
 router.get('/test', (req, res) => {
