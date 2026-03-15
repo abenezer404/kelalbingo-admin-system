@@ -16,23 +16,43 @@ class DatabaseService {
 
   // User management
   async createUser(username, passwordHash, machineSerial, registrationCode = null) {
-    const sql = `
-      INSERT INTO pending_users (username, password_hash, machine_serial, registration_code, is_synced)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    return await this.db.run(sql, [username, passwordHash, machineSerial, registrationCode, true]);
+    if (this.db.isPostgres) {
+      const sql = `
+        INSERT INTO pending_users (username, password_hash, machine_serial, registration_code, is_synced)
+        VALUES ($1, $2, $3, $4, $5) RETURNING id
+      `;
+      return await this.db.run(sql, [username, passwordHash, machineSerial, registrationCode, true]);
+    } else {
+      const sql = `
+        INSERT INTO pending_users (username, password_hash, machine_serial, registration_code, is_synced)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      return await this.db.run(sql, [username, passwordHash, machineSerial, registrationCode, true]);
+    }
   }
 
   async getUserByUsername(username, machineSerial = null) {
-    let sql = 'SELECT * FROM pending_users WHERE username = ?';
-    let params = [username];
-    
-    if (machineSerial) {
-      sql += ' AND machine_serial = ?';
-      params.push(machineSerial);
+    if (this.db.isPostgres) {
+      let sql = 'SELECT * FROM pending_users WHERE username = $1';
+      let params = [username];
+      
+      if (machineSerial) {
+        sql += ' AND machine_serial = $2';
+        params.push(machineSerial);
+      }
+      
+      return await this.db.get(sql, params);
+    } else {
+      let sql = 'SELECT * FROM pending_users WHERE username = ?';
+      let params = [username];
+      
+      if (machineSerial) {
+        sql += ' AND machine_serial = ?';
+        params.push(machineSerial);
+      }
+      
+      return await this.db.get(sql, params);
     }
-    
-    return await this.db.get(sql, params);
   }
 
   async getAllUsers() {
@@ -41,13 +61,23 @@ class DatabaseService {
   }
 
   async deleteUser(userId) {
-    const sql = 'DELETE FROM pending_users WHERE id = ?';
-    return await this.db.run(sql, [userId]);
+    if (this.db.isPostgres) {
+      const sql = 'DELETE FROM pending_users WHERE id = $1';
+      return await this.db.run(sql, [userId]);
+    } else {
+      const sql = 'DELETE FROM pending_users WHERE id = ?';
+      return await this.db.run(sql, [userId]);
+    }
   }
 
   async updateUserPassword(userId, newPasswordHash) {
-    const sql = 'UPDATE pending_users SET password_hash = ? WHERE id = ?';
-    return await this.db.run(sql, [newPasswordHash, userId]);
+    if (this.db.isPostgres) {
+      const sql = 'UPDATE pending_users SET password_hash = $1 WHERE id = $2';
+      return await this.db.run(sql, [newPasswordHash, userId]);
+    } else {
+      const sql = 'UPDATE pending_users SET password_hash = ? WHERE id = ?';
+      return await this.db.run(sql, [newPasswordHash, userId]);
+    }
   }
 
   // Package management
@@ -72,22 +102,41 @@ class DatabaseService {
   }
 
   async assignPackage(userId, packageId, amount, assignedBy) {
-    const sql = `
-      INSERT INTO user_packages (user_id, package_id, amount, assigned_by, is_redeemed)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    return await this.db.run(sql, [userId, packageId, amount, assignedBy, false]);
+    if (this.db.isPostgres) {
+      const sql = `
+        INSERT INTO user_packages (user_id, package_id, amount, assigned_by, is_redeemed)
+        VALUES ($1, $2, $3, $4, $5) RETURNING id
+      `;
+      return await this.db.run(sql, [userId, packageId, amount, assignedBy, false]);
+    } else {
+      const sql = `
+        INSERT INTO user_packages (user_id, package_id, amount, assigned_by, is_redeemed)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      return await this.db.run(sql, [userId, packageId, amount, assignedBy, false]);
+    }
   }
 
   async getUserPackages(userId) {
-    const sql = `
-      SELECT up.*, p.name as package_name 
-      FROM user_packages up 
-      LEFT JOIN packages p ON up.package_id = p.id 
-      WHERE up.user_id = ? 
-      ORDER BY up.created_at DESC
-    `;
-    return await this.db.query(sql, [userId]);
+    if (this.db.isPostgres) {
+      const sql = `
+        SELECT up.*, p.name as package_name 
+        FROM user_packages up 
+        LEFT JOIN packages p ON up.package_id = p.id 
+        WHERE up.user_id = $1 
+        ORDER BY up.created_at DESC
+      `;
+      return await this.db.query(sql, [userId]);
+    } else {
+      const sql = `
+        SELECT up.*, p.name as package_name 
+        FROM user_packages up 
+        LEFT JOIN packages p ON up.package_id = p.id 
+        WHERE up.user_id = ? 
+        ORDER BY up.created_at DESC
+      `;
+      return await this.db.query(sql, [userId]);
+    }
   }
 
   async getPackageAssignments() {
@@ -140,12 +189,21 @@ class DatabaseService {
   }
 
   async updateDeviceAccess(deviceSerial, deviceFingerprint = null) {
-    const sql = `
-      UPDATE authorized_devices 
-      SET device_fingerprint = ?, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
-      WHERE device_serial = ?
-    `;
-    return await this.db.run(sql, [deviceFingerprint, deviceSerial]);
+    if (this.db.isPostgres) {
+      const sql = `
+        UPDATE authorized_devices 
+        SET device_fingerprint = $1, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
+        WHERE device_serial = $2
+      `;
+      return await this.db.run(sql, [deviceFingerprint, deviceSerial]);
+    } else {
+      const sql = `
+        UPDATE authorized_devices 
+        SET device_fingerprint = ?, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
+        WHERE device_serial = ?
+      `;
+      return await this.db.run(sql, [deviceFingerprint, deviceSerial]);
+    }
   }
 
   async removeDevice(deviceSerial) {
@@ -175,13 +233,23 @@ class DatabaseService {
   }
 
   async getDeviceAccessLogs(limit = 100) {
-    const sql = `
-      SELECT device_serial, device_fingerprint, success, message, accessed_at
-      FROM device_access_logs 
-      ORDER BY accessed_at DESC 
-      LIMIT ?
-    `;
-    return await this.db.query(sql, [limit]);
+    if (this.db.isPostgres) {
+      const sql = `
+        SELECT device_serial, device_fingerprint, success, message, accessed_at
+        FROM device_access_logs 
+        ORDER BY accessed_at DESC 
+        LIMIT $1
+      `;
+      return await this.db.query(sql, [limit]);
+    } else {
+      const sql = `
+        SELECT device_serial, device_fingerprint, success, message, accessed_at
+        FROM device_access_logs 
+        ORDER BY accessed_at DESC 
+        LIMIT ?
+      `;
+      return await this.db.query(sql, [limit]);
+    }
   }
 
   // Statistics
