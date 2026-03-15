@@ -9,40 +9,62 @@
 </head>
 
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Device Management</h1>
-            <div class="header-actions">
-                <button class="btn btn-primary" id="addDeviceBtn">Add Device</button>
-                <button class="btn btn-secondary" onclick="window.location.href='dashboard.html'">Back to
-                    Dashboard</button>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>KELALBINGO</h1>
+            <div class="admin-info">
+                <div id="adminName"></div>
             </div>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="users.html">User Management</a></li>
+            <li><a href="packages.html">Balance Packages</a></li>
+            <li><a href="devices.html">Device Management</a></li>
+            <li><a href="logs.html">Activity Logs</a></li>
+            <li><a href="change-password.html">Change Password</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <button id="logoutBtn" class="btn btn-secondary btn-block">Logout</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Device Management</h1>
+            <p>Manage authorized devices for desktop application</p>
         </div>
 
         <div class="content">
             <!-- Add Device Form -->
-            <div class="card" id="addDeviceCard" style="display: none;">
-                <h3>Add Authorized Device</h3>
+            <div class="section" id="addDeviceCard" style="display: none;">
+                <h2>Add Authorized Device</h2>
                 <form id="addDeviceForm">
-                    <div class="form-group">
-                        <label for="deviceSerial">Device Serial Number:</label>
-                        <input type="text" id="deviceSerial" required placeholder="Enter device serial number">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deviceSerial">Device Serial Number</label>
+                            <input type="text" id="deviceSerial" required placeholder="Enter device serial number">
+                        </div>
+                        <div class="form-group">
+                            <label for="deviceName">Device Name</label>
+                            <input type="text" id="deviceName" placeholder="Optional device name">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="deviceName">Device Name:</label>
-                        <input type="text" id="deviceName" placeholder="Optional device name">
-                    </div>
-                    <div class="form-group">
-                        <label for="licenseType">License Type:</label>
-                        <select id="licenseType">
-                            <option value="standard">Standard</option>
-                            <option value="premium">Premium</option>
-                            <option value="trial">Trial</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="expiresAt">Expires At (Optional):</label>
-                        <input type="datetime-local" id="expiresAt">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="licenseType">License Type</label>
+                            <select id="licenseType">
+                                <option value="standard">Standard</option>
+                                <option value="premium">Premium</option>
+                                <option value="trial">Trial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="expiresAt">Expires At (Optional)</label>
+                            <input type="datetime-local" id="expiresAt">
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Add Device</button>
@@ -52,8 +74,11 @@
             </div>
 
             <!-- Devices List -->
-            <div class="card">
-                <h3>Authorized Devices</h3>
+            <div class="section">
+                <div class="section-header">
+                    <h2>Authorized Devices</h2>
+                    <button class="btn btn-primary" id="addDeviceBtn">Add Device</button>
+                </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -78,8 +103,8 @@
             </div>
 
             <!-- Device Access Logs -->
-            <div class="card">
-                <h3>Recent Access Attempts</h3>
+            <div class="section">
+                <h2>Recent Access Attempts</h2>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -99,7 +124,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script src="js/common.js"></script>
     <script>
@@ -211,10 +236,39 @@
             }
         }
 
-        // Load access logs (simplified for now)
+        // Load access logs
         async function loadAccessLogs() {
+            try {
+                const response = await apiRequest('/api/access-logs');
+
+                if (response.success) {
+                    displayAccessLogs(response.logs);
+                } else {
+                    showNotification('Failed to load access logs', 'error');
+                }
+            } catch (error) {
+                const tbody = document.getElementById('accessLogsTableBody');
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">Failed to load access logs</td></tr>';
+            }
+        }
+
+        // Display access logs in table
+        function displayAccessLogs(logs) {
             const tbody = document.getElementById('accessLogsTableBody');
-            tbody.innerHTML = '<tr><td colspan="4" class="no-data">Access logs feature coming soon</td></tr>';
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">No access logs found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td><code>${log.device_serial}</code></td>
+                    <td><span class="status ${log.success ? 'success' : 'error'}">${log.success ? '✅ Success' : '❌ Failed'}</span></td>
+                    <td>${log.message}</td>
+                    <td>${formatDate(log.accessed_at)}</td>
+                </tr>
+            `).join('');
         }
 
         // Utility functions
@@ -251,12 +305,31 @@
             color: black;
         }
 
+        .status.success {
+            color: #28a745;
+        }
+
+        .status.error {
+            color: #dc3545;
+        }
+
         .status.active {
             color: #28a745;
         }
 
         .status.inactive {
             color: #dc3545;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            margin: 0;
         }
 
         .form-group {

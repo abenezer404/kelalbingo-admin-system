@@ -27,7 +27,7 @@ const validateApiKey = (req, res, next) => {
  */
 router.post('/validate-device', validateApiKey, (req, res) => {
     try {
-        const { deviceSerial, deviceFingerprint, appVersion } = req.body;
+        const { deviceSerial, appVersion } = req.body;
         
         if (!deviceSerial) {
             return res.status(400).json({
@@ -53,7 +53,7 @@ router.post('/validate-device', validateApiKey, (req, res) => {
 
             if (!device) {
                 // Log unauthorized access attempt
-                logDeviceAccess(deviceSerial, deviceFingerprint, false, 'Device not authorized');
+                logDeviceAccess(deviceSerial, null, false, 'Device not authorized');
                 
                 return res.json({
                     success: true,
@@ -71,21 +71,21 @@ router.post('/validate-device', validateApiKey, (req, res) => {
                 });
             }
 
-            // Update device fingerprint and last access
+            // Update last access
             const updateSql = `
                 UPDATE authorized_devices 
-                SET device_fingerprint = ?, last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
+                SET last_access = CURRENT_TIMESTAMP, access_count = access_count + 1
                 WHERE device_serial = ?
             `;
             
-            db.run(updateSql, [deviceFingerprint, deviceSerial], (updateErr) => {
+            db.run(updateSql, [deviceSerial], (updateErr) => {
                 if (updateErr) {
                     console.error('Failed to update device access:', updateErr);
                 }
             });
 
             // Log successful access
-            logDeviceAccess(deviceSerial, deviceFingerprint, true, 'Access granted');
+            logDeviceAccess(deviceSerial, null, true, 'Access granted');
 
             // Return authorization success
             res.json({
@@ -231,6 +231,41 @@ router.get('/devices', validateApiKey, (req, res) => {
 });
 
 /**
+ * Get device access logs (admin only)
+ */
+router.get('/access-logs', validateApiKey, (req, res) => {
+    try {
+        const sql = `
+            SELECT device_serial, device_fingerprint, success, message, accessed_at
+            FROM device_access_logs 
+            ORDER BY accessed_at DESC 
+            LIMIT 100
+        `;
+        
+        db.all(sql, [], (err, logs) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error'
+                });
+            }
+
+            res.json({
+                success: true,
+                logs: logs
+            });
+        });
+    } catch (error) {
+        console.error('Access logs error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+/**
  * Log device access attempts
  */
 function logDeviceAccess(deviceSerial, deviceFingerprint, success, message) {
@@ -239,7 +274,7 @@ function logDeviceAccess(deviceSerial, deviceFingerprint, success, message) {
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
     
-    db.run(sql, [deviceSerial, deviceFingerprint, success ? 1 : 0, message], (err) => {
+    db.run(sql, [deviceSerial, deviceFingerprint || null, success ? 1 : 0, message], (err) => {
         if (err) {
             console.error('Failed to log device access:', err);
         }
