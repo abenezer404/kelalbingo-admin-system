@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const config = require('./src/config/config');
 const { initDatabase } = require('./src/config/database');
+const { initializeEssentialData } = require('./src/utils/initializeData');
 
 const app = express();
 
@@ -100,11 +101,16 @@ app.use((err, req, res, next) => {
 // Initialize database and start server
 initDatabase()
   .then(() => {
+    console.log('📊 Database initialized successfully');
+    return initializeEssentialData();
+  })
+  .then(() => {
     app.listen(config.port, '0.0.0.0', () => {
-      // Server started successfully - no console output in production
+      console.log(`🚀 Server running on port ${config.port}`);
+      console.log(`🌐 Admin panel: http://localhost:${config.port}`);
     });
   })
   .catch((err) => {
-    // Database initialization error - exit process
+    console.error('❌ Startup error:', err);
     process.exit(1);
   });
