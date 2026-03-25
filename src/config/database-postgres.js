@@ -170,6 +170,29 @@ const initPostgresDatabase = async () => {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        telegram_id TEXT UNIQUE NOT NULL,
+        credit_balance DECIMAL DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agent_transactions (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER REFERENCES agents(id),
+        transaction_type TEXT NOT NULL,
+        amount DECIMAL NOT NULL,
+        target_user_id INTEGER,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('✅ PostgreSQL database initialized successfully');
     return client;
     
