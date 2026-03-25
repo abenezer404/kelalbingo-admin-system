@@ -208,12 +208,20 @@
                     <td>${device.expires_at ? formatDate(device.expires_at) : 'Never'}</td>
                     <td>
                         ${device.is_active ?
-                    `<button class="btn btn-sm btn-danger" onclick="removeDevice('${device.device_serial}')">Remove</button>` :
+                    `<button class="btn btn-sm btn-danger remove-device-btn" data-serial="${device.device_serial}">Remove</button>` :
                     `<span class="text-muted">Removed</span>`
                 }
                     </td>
                 </tr>
             `).join('');
+
+            // Securely attach event listeners to avoid CSP inline handler violations
+            document.querySelectorAll('.remove-device-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serial = this.getAttribute('data-serial');
+                    removeDevice(serial);
+                });
+            });
         }
 
         // Remove device
