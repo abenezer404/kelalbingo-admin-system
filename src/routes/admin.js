@@ -253,4 +253,64 @@ router.post('/agents/:id/fund', verifyToken, (req, res) => {
     }
 });
 
+// Deduct agent credit
+router.post('/agents/:id/deduct', verifyToken, (req, res) => {
+    try {
+        const { amount } = req.body;
+        const agentId = req.params.id;
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Valid positive amount is required' });
+        }
+        
+        // First check if agent has enough balance
+        db.get('SELECT credit_balance FROM agents WHERE id = ?', [agentId], (err, agent) => {
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+            
+            if (agent.credit_balance < amount) {
+                return res.status(400).json({ success: false, message: 'Insufficient agent balance' });
+            }
+
+            const sql = `UPDATE agents SET credit_balance = credit_balance - ? WHERE id = ?`;
+            db.run(sql, [parseFloat(amount), agentId], function(err) {
+                if (err) return res.status(500).json({ success: false, message: 'Database error' });
+                
+                // Log the transaction
+                const logSql = `INSERT INTO agent_transactions (agent_id, transaction_type, amount, description) VALUES (?, ?, ?, ?)`;
+                db.run(logSql, [agentId, 'deduct', parseFloat(amount), 'Manual deduction by admin'], (logErr) => {
+                    if (logErr) console.error('Error logging agent transaction:', logErr);
+                });
+                
+                res.json({ success: true, message: 'Balance deducted successfully' });
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Get agent transaction logs
+router.get('/agents/:id/transactions', verifyToken, (req, res) => {
+    try {
+        const agentId = req.params.id;
+        const sql = `
+            SELECT t.*, u.username as target_username
+            FROM agent_transactions t
+            LEFT JOIN pending_users u ON t.target_user_id = u.id
+            WHERE t.agent_id = ?
+            ORDER BY t.created_at DESC
+            LIMIT 100
+        `;
+        db.all(sql, [agentId], (err, logs) => {
+            if (err) {
+                console.error('Error fetching agent logs:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            res.json({ success: true, logs: logs || [] });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;
