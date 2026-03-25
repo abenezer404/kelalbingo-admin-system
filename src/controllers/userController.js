@@ -8,7 +8,7 @@ const { db } = require('../config/database');
  */
 const syncUser = async (req, res) => {
   try {
-    const { username, password, machineSerial } = req.body;
+    const { username, password } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
 
     // Validate input
@@ -28,24 +28,15 @@ const syncUser = async (req, res) => {
       });
     }
 
-    // Validate machine serial
-    if (!machineSerial) {
-      logSync(null, ipAddress, machineSerial, false);
-      return res.status(400).json({
-        success: false,
-        message: 'Machine serial number is required'
-      });
-    }
-
-    // Get user from database by username and machine serial
-    const user = await User.getByUsernameAndSerial(username, machineSerial);
+    // Get user from database by username only (device licensing disabled)
+    const user = await User.getByUsername(username);
 
     if (!user) {
       // Log failed attempt
-      logSync(null, ipAddress, machineSerial, false);
+      logSync(null, ipAddress, 'no-device-check', false);
       return res.status(404).json({
         success: false,
-        message: 'User not found for this machine. Please contact administrator.'
+        message: 'User not found. Please contact administrator.'
       });
     }
 
@@ -63,34 +54,31 @@ const syncUser = async (req, res) => {
     // Verify password
     const isValidPassword = await comparePassword(password, user.password_hash);
     if (!isValidPassword) {
-      logSync(user.id, ipAddress, machineSerial, false);
+      logSync(user.id, ipAddress, 'no-device-check', false);
       return res.status(401).json({
         success: false,
         message: 'Invalid password'
       });
     }
 
-    // User found with correct serial and password - no additional serial validation needed
-    // since we already looked up by username+serial combination
-
     // Mark as synced
     await User.markAsSynced(user.id);
 
     // Log successful sync
-    logSync(user.id, ipAddress, machineSerial, true);
+    logSync(user.id, ipAddress, 'no-device-check', true);
 
-    // Return user data
+    // Return user data with plain text password
     res.json({
       success: true,
       message: 'User synced successfully',
       user: {
         id: user.id,
         username: user.username,
-        password_hash: user.password_hash
+        password: password  // Return plain text password instead of hash
       }
     });
   } catch (error) {
-    // Sync user error - handled by response
+    console.error('Sync user error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

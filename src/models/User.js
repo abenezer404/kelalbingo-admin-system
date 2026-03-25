@@ -151,15 +151,31 @@ class User {
   }
 
   /**
-   * Delete user
+   * Delete user and all related records (required for PostgreSQL FK constraints)
    */
   static delete(userId) {
-    return new Promise((resolve, reject) => {
-      const sql = `DELETE FROM pending_users WHERE id = ?`;
-      db.run(sql, [userId], function(err) {
+    const runSql = (sql, params) => new Promise((resolve, reject) => {
+      db.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve({ changes: this.changes });
       });
+    });
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Delete related records first to satisfy foreign key constraints (PostgreSQL)
+        await runSql(`DELETE FROM sync_logs WHERE user_id = ?`, [userId]);
+        await runSql(`DELETE FROM password_reset_logs WHERE user_id = ?`, [userId]);
+        await runSql(`DELETE FROM balance_sync_logs WHERE user_id = ?`, [userId]);
+        await runSql(`DELETE FROM user_packages WHERE user_id = ?`, [userId]);
+        await runSql(`DELETE FROM user_balances WHERE user_id = ?`, [userId]);
+
+        // Now delete the user
+        const result = await runSql(`DELETE FROM pending_users WHERE id = ?`, [userId]);
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
