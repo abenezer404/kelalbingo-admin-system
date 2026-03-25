@@ -186,4 +186,68 @@ router.get('/device-access-logs', verifyToken, async (req, res) => {
     }
 });
 
+// Agent Management routes
+router.get('/agents', verifyToken, (req, res) => {
+    try {
+        const sql = `
+            SELECT id, name, telegram_id, credit_balance, is_active, created_at
+            FROM agents 
+            ORDER BY created_at DESC
+        `;
+        db.all(sql, [], (err, agents) => {
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            res.json({ success: true, agents: agents || [] });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/agents/add', verifyToken, (req, res) => {
+    try {
+        const { name, telegramId, initialCredit } = req.body;
+        if (!name || !telegramId) {
+            return res.status(400).json({ success: false, message: 'Name and Telegram ID are required' });
+        }
+        
+        const sql = `INSERT INTO agents (name, telegram_id, credit_balance, is_active) VALUES (?, ?, ?, ?)`;
+        db.run(sql, [name, telegramId, parseFloat(initialCredit) || 0, true], function(err) {
+            if (err) {
+                if (err.code === 'SQLITE_CONSTRAINT' || err.code === '23505') {
+                    return res.status(400).json({ success: false, message: 'Agent with this Telegram ID already exists' });
+                }
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            res.json({ success: true, message: 'Agent added successfully', agentId: this.lastID });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/agents/:id/fund', verifyToken, (req, res) => {
+    try {
+        const { amount } = req.body;
+        const agentId = req.params.id;
+        if (!amount || isNaN(amount)) {
+            return res.status(400).json({ success: false, message: 'Valid amount is required' });
+        }
+        
+        const sql = `UPDATE agents SET credit_balance = credit_balance + ? WHERE id = ?`;
+        db.run(sql, [parseFloat(amount), agentId], function(err) {
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            
+            // Log the transaction
+            const logSql = `INSERT INTO agent_transactions (agent_id, transaction_type, amount, description) VALUES (?, ?, ?, ?)`;
+            db.run(logSql, [agentId, 'fund', parseFloat(amount), 'Manual funding by admin'], (logErr) => {
+                if (logErr) console.error('Error logging agent transaction:', logErr);
+            });
+            
+            res.json({ success: true, message: 'Agent funded successfully' });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;

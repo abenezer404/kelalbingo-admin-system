@@ -352,7 +352,35 @@ const initDatabase = () => {
           changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
-        // Password change logs table created or already exists
+        if (err) reject(err);
+      });
+
+      db.run(`
+        CREATE TABLE IF NOT EXISTS agents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          telegram_id TEXT UNIQUE NOT NULL,
+          credit_balance DECIMAL DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `, (err) => {
+        if (err) reject(err);
+      });
+
+      db.run(`
+        CREATE TABLE IF NOT EXISTS agent_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          agent_id INTEGER REFERENCES agents(id),
+          transaction_type TEXT NOT NULL,
+          amount DECIMAL NOT NULL,
+          target_user_id INTEGER,
+          description TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `, (err) => {
+        if (err) reject(err);
+        resolve(); // Resolve the promise after the last table is created
       });
     });
   });

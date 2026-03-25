@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Management - KELALBINGO Admin</title>
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .badge-success { background: #28a745; color: white; }
+        .badge-warning { background: #ffc107; color: black; }
+        .badge-danger { background: #dc3545; color: white; }
+        
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .section-header h2 { margin: 0; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .form-actions { margin-top: 20px; }
+        code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>KELALBINGO</h1>
+            <div class="admin-info">
+                <div id="adminName"></div>
+            </div>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="users.html">User Management</a></li>
+            <li><a href="packages.html">Balance Packages</a></li>
+            <li><a href="agents.html">Agent Management</a></li>
+            <li><a href="devices.html">Device Management</a></li>
+            <li><a href="logs.html">Activity Logs</a></li>
+            <li><a href="change-password.html">Change Password</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <button id="logoutBtn" class="btn btn-secondary btn-block">Logout</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Agent Management</h1>
+            <p>Manage bot agents and their credit balances</p>
+        </div>
+
+        <div class="content">
+            <!-- Add Agent Form -->
+            <div class="section" id="addAgentCard" style="display: none;">
+                <h2>Add Authorized Bot Agent</h2>
+                <form id="addAgentForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentName">Agent Name</label>
+                            <input type="text" id="agentName" required placeholder="Agent full name or nickname">
+                        </div>
+                        <div class="form-group">
+                            <label for="telegramId">Telegram ID</label>
+                            <input type="text" id="telegramId" required placeholder="e.g. 123456789">
+                            <small class="text-muted">Agent must text the bot to find their ID</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="initialCredit">Initial Credit Balance (ብር)</label>
+                            <input type="number" id="initialCredit" value="0" min="0" step="1">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add Agent</button>
+                        <button type="button" class="btn btn-secondary" id="cancelAddBtn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Agents List -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>Authorized Agents</h2>
+                    <button class="btn btn-primary" id="addAgentBtn">Add Agent</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Telegram ID</th>
+                                <th>Credit Balance</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agentsTableBody">
+                            <tr>
+                                <td colspan="6" class="loading">Loading agents...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/common.js"></script>
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            initPage('agents.html');
+            loadAgents();
+        });
+
+        // Add agent form toggle
+        document.getElementById('addAgentBtn').addEventListener('click', () => {
+            const card = document.getElementById('addAgentCard');
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('cancelAddBtn').addEventListener('click', () => {
+            document.getElementById('addAgentCard').style.display = 'none';
+            document.getElementById('addAgentForm').reset();
+        });
+
+        // Add agent form submission
+        document.getElementById('addAgentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                name: document.getElementById('agentName').value,
+                telegramId: document.getElementById('telegramId').value,
+                initialCredit: document.getElementById('initialCredit').value
+            };
+
+            try {
+                const response = await apiRequest('/admin/agents/add', 'POST', formData);
+
+                if (response.success) {
+                    showSuccess('Agent added successfully');
+                    document.getElementById('addAgentCard').style.display = 'none';
+                    document.getElementById('addAgentForm').reset();
+                    loadAgents();
+                } else {
+                    showError(response.message || 'Failed to add agent');
+                }
+            } catch (error) {
+                showError('Error adding agent');
+            }
+        });
+
+        // Load agents
+        async function loadAgents() {
+            try {
+                const response = await apiRequest('/admin/agents');
+
+                if (response.success) {
+                    displayAgents(response.agents);
+                } else {
+                    showError('Failed to load agents');
+                }
+            } catch (error) {
+                showError('Error loading agents');
+            }
+        }
+
+        // Display agents in table
+        function displayAgents(agents) {
+            const tbody = document.getElementById('agentsTableBody');
+
+            if (agents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No authorized agents found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = agents.map(agent => `
+                <tr>
+                    <td><strong>${agent.name}</strong></td>
+                    <td><code>${agent.telegram_id}</code></td>
+                    <td>
+                        <strong style="color: #667eea; font-size: 1.1em;">${agent.credit_balance} ብር</strong>
+                    </td>
+                    <td><span class="badge ${agent.is_active ? 'badge-success' : 'badge-danger'}">${agent.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>${new Date(agent.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary fund-agent-btn" data-id="${agent.id}" data-name="${agent.name}">Fund Credit</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Attach event listeners for the Fund Credit buttons securely
+            document.querySelectorAll('.fund-agent-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const name = this.getAttribute('data-name');
+                    fundAgent(id, name);
+                });
+            });
+        }
+
+        // Fund Agent
+        async function fundAgent(id, name) {
+            // Using prompt for quick funding
+            const amountStr = prompt(`Enter amount to ADD to ${name}'s credit balance:`);
+            if (!amountStr) return;
+            
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                showError('Please enter a valid positive number');
+                return;
+            }
+
+            const confirmed = await showConfirm(`Are you sure you want to add ${amount} ብር to ${name}?`, 'Fund Agent');
+            if (!confirmed) return;
+
+            try {
+                const response = await apiRequest(`/admin/agents/${id}/fund`, 'POST', { amount });
+
+                if (response.success) {
+                    showSuccess('Agent funded successfully');
+                    loadAgents();
+                } else {
+                    showError(response.message || 'Failed to fund agent');
+                }
+            } catch (error) {
+                showError('Error funding agent');
+            }
+        }
+    </script>
+</body>
+</html>
