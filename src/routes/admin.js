@@ -195,7 +195,10 @@ router.get('/agents', verifyToken, (req, res) => {
             ORDER BY created_at DESC
         `;
         db.all(sql, [], (err, agents) => {
-            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            if (err) {
+                console.error('Database error in /agents:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
             res.json({ success: true, agents: agents || [] });
         });
     } catch (error) {
