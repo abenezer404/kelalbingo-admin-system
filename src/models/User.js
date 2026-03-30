@@ -4,10 +4,10 @@ class User {
   /**
    * Create a new pending user
    */
-  static create(username, passwordHash, expiresAt = null) {
+  static create(username, passwordHash, expiresAt = null, address = null) {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO pending_users (username, password_hash, expires_at) VALUES (?, ?, ?)`;
-      db.run(sql, [username, passwordHash, expiresAt], function(err) {
+      const sql = `INSERT INTO pending_users (username, password_hash, expires_at, address) VALUES (?, ?, ?, ?)`;
+      db.run(sql, [username, passwordHash, expiresAt, address], function(err) {
         if (err) {
           reject(err);
         } else {
@@ -20,10 +20,10 @@ class User {
   /**
    * Create a new pending user with machine serial
    */
-  static createWithMachineSerial(username, passwordHash, machineSerial, expiresAt = null) {
+  static createWithMachineSerial(username, passwordHash, machineSerial, expiresAt = null, address = null) {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO pending_users (username, password_hash, machine_serial, expires_at) VALUES (?, ?, ?, ?)`;
-      db.run(sql, [username, passwordHash, machineSerial, expiresAt], function(err) {
+      const sql = `INSERT INTO pending_users (username, password_hash, machine_serial, expires_at, address) VALUES (?, ?, ?, ?, ?)`;
+      db.run(sql, [username, passwordHash, machineSerial, expiresAt, address], function(err) {
         if (err) {
           reject(err);
         } else {
@@ -94,6 +94,7 @@ class User {
         SELECT 
           pu.id, 
           pu.username, 
+          pu.address,
           pu.machine_serial, 
           pu.created_at, 
           pu.expires_at, 

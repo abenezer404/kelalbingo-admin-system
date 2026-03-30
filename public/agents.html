@@ -86,6 +86,10 @@
                             <label for="initialCredit">Initial Credit Balance (ብር)</label>
                             <input type="number" id="initialCredit" value="0" min="0" step="1">
                         </div>
+                        <div class="form-group">
+                            <label for="agentAddress">Address</label>
+                            <input type="text" id="agentAddress" placeholder="Optional agent address">
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Add Agent</button>
@@ -106,6 +110,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Telegram ID</th>
+                                <th>Address</th>
                                 <th>Credit Balance</th>
                                 <th>Status</th>
                                 <th>Joined</th>
@@ -114,7 +119,7 @@
                         </thead>
                         <tbody id="agentsTableBody">
                             <tr>
-                                <td colspan="6" class="loading">Loading agents...</td>
+                                <td colspan="7" class="loading">Loading agents...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -172,7 +177,8 @@
             const formData = {
                 name: document.getElementById('agentName').value,
                 telegramId: document.getElementById('telegramId').value,
-                initialCredit: document.getElementById('initialCredit').value
+                initialCredit: document.getElementById('initialCredit').value,
+                address: document.getElementById('agentAddress').value.trim() || null
             };
 
             try {
@@ -211,7 +217,7 @@
             const tbody = document.getElementById('agentsTableBody');
 
             if (agents.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No authorized agents found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">No authorized agents found</td></tr>';
                 return;
             }
 
@@ -219,6 +225,7 @@
                 <tr>
                     <td><strong>${agent.name}</strong></td>
                     <td><code>${agent.telegram_id}</code></td>
+                    <td>${agent.address || '<span style="color:#999;">N/A</span>'}</td>
                     <td>
                         <strong style="color: #667eea; font-size: 1.1em;">${agent.credit_balance} ብር</strong>
                     </td>

@@ -196,8 +196,8 @@ const syncBalance = async (req, res) => {
           });
         }
 
-        // Calculate total unredeemed balance
-        const totalBalance = packages.reduce((sum, pkg) => sum + pkg.amount, 0);
+        // Calculate total unredeemed balance correctly using parseFloat to avoid string concatenation
+        const totalBalance = packages.reduce((sum, pkg) => sum + (parseFloat(pkg.amount) || 0), 0);
 
         // Mark packages as redeemed
         if (packages.length > 0) {

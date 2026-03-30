@@ -165,7 +165,7 @@ const resetPassword = async (req, res) => {
  */
 const createUser = async (req, res) => {
   try {
-    const { username, password, machineSerial, expiresInDays } = req.body;
+    const { username, password, machineSerial, expiresInDays, address } = req.body;
 
     // Validate input
     const usernameValidation = validateUsername(username);
@@ -213,7 +213,13 @@ const createUser = async (req, res) => {
     }
 
     // Create user with machine serial
-    const user = await User.createWithMachineSerial(username, passwordHash, machineSerial.trim(), expiresAt);
+    const user = await User.createWithMachineSerial(
+      username,
+      passwordHash,
+      machineSerial.trim(),
+      expiresAt,
+      address ? address.trim() : null
+    );
 
     res.status(201).json({
       success: true,

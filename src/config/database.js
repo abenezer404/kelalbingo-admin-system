@@ -132,6 +132,7 @@ const initDatabase = () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT NOT NULL,
           password_hash TEXT NOT NULL,
+          address TEXT,
           registration_code TEXT UNIQUE,
           machine_serial TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -146,6 +147,9 @@ const initDatabase = () => {
 
       // Add machine_serial column to pending_users if it doesn't exist
       db.run(`ALTER TABLE pending_users ADD COLUMN machine_serial TEXT`, (err) => {
+        // Migration completed - column added or already exists
+      });
+      db.run(`ALTER TABLE pending_users ADD COLUMN address TEXT`, (err) => {
         // Migration completed - column added or already exists
       });
 
@@ -360,12 +364,16 @@ const initDatabase = () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           telegram_id TEXT UNIQUE NOT NULL,
+          address TEXT,
           credit_balance DECIMAL DEFAULT 0,
           is_active BOOLEAN DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
         if (err) reject(err);
+      });
+      db.run(`ALTER TABLE agents ADD COLUMN address TEXT`, (err) => {
+        // Migration completed - column added or already exists
       });
 
       db.run(`

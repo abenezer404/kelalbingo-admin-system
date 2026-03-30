@@ -190,7 +190,7 @@ router.get('/device-access-logs', verifyToken, async (req, res) => {
 router.get('/agents', verifyToken, (req, res) => {
     try {
         const sql = `
-            SELECT id, name, telegram_id, credit_balance, is_active, created_at
+            SELECT id, name, telegram_id, address, credit_balance, is_active, created_at
             FROM agents 
             ORDER BY created_at DESC
         `;
@@ -208,13 +208,13 @@ router.get('/agents', verifyToken, (req, res) => {
 
 router.post('/agents/add', verifyToken, (req, res) => {
     try {
-        const { name, telegramId, initialCredit } = req.body;
+        const { name, telegramId, initialCredit, address } = req.body;
         if (!name || !telegramId) {
             return res.status(400).json({ success: false, message: 'Name and Telegram ID are required' });
         }
         
-        const sql = `INSERT INTO agents (name, telegram_id, credit_balance, is_active) VALUES (?, ?, ?, ?)`;
-        db.run(sql, [name, telegramId, parseFloat(initialCredit) || 0, true], function(err) {
+        const sql = `INSERT INTO agents (name, telegram_id, address, credit_balance, is_active) VALUES (?, ?, ?, ?, ?)`;
+        db.run(sql, [name, telegramId, address ? address.trim() : null, parseFloat(initialCredit) || 0, true], function(err) {
             if (err) {
                 if (err.code === 'SQLITE_CONSTRAINT' || err.code === '23505') {
                     return res.status(400).json({ success: false, message: 'Agent with this Telegram ID already exists' });

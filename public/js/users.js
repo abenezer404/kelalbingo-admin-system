@@ -32,6 +32,7 @@ document.getElementById('createUserForm').addEventListener('submit', async (e) =
     const username = document.getElementById('newUsername').value;
     const password = document.getElementById('newPassword').value;
     const machineSerial = document.getElementById('machineSerial').value.trim();
+    const address = document.getElementById('userAddress').value.trim();
     const expiresInDays = document.getElementById('expiresInDays').value;
 
     // Validate machine serial
@@ -45,6 +46,7 @@ document.getElementById('createUserForm').addEventListener('submit', async (e) =
             username,
             password,
             machineSerial,
+            address: address || null,
             expiresInDays: expiresInDays ? parseInt(expiresInDays) : null
         });
 
@@ -84,12 +86,13 @@ function displayUsers(users) {
         return;
     }
 
-    let html = '<table class="data-table"><thead><tr><th>Username</th><th>Machine Serial</th><th>Current Balance</th><th>Pending Packages</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+    let html = '<table class="data-table"><thead><tr><th>Username</th><th>Address</th><th>Machine Serial</th><th>Current Balance</th><th>Pending Packages</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
 
     users.forEach(user => {
         const status = user.is_synced ? '<span class="badge badge-success">Synced</span>' : '<span class="badge badge-warning">Pending</span>';
         const createdAt = new Date(user.created_at).toLocaleString();
         const machineSerial = user.machine_serial || '<span style="color: #999;">Not registered</span>';
+        const address = user.address || '<span style="color: #999;">N/A</span>';
         const currentBalance = user.current_balance || 0;
         const pendingBalance = user.pending_balance || 0;
         const balanceUpdated = user.balance_updated_at ? new Date(user.balance_updated_at).toLocaleString() : 'Never';
@@ -97,6 +100,7 @@ function displayUsers(users) {
         html += `
           <tr>
             <td>${user.username}</td>
+            <td>${address}</td>
             <td>${machineSerial}</td>
             <td>
               <strong style="color: #667eea; font-size: 1.1em;">${currentBalance} ብር</strong>
