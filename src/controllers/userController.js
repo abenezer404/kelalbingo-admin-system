@@ -8,7 +8,7 @@ const { db } = require('../config/database');
  */
 const syncUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, machineSerial } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
 
     // Validate input
@@ -28,8 +28,16 @@ const syncUser = async (req, res) => {
       });
     }
 
-    // Get user from database by username only (device licensing disabled)
-    const user = await User.getByUsername(username);
+    if (!machineSerial || machineSerial.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Machine serial number is required'
+      });
+    }
+
+    // Get user from database by username + machine serial
+    // (ensures we return the correct address for the device)
+    const user = await User.getByUsernameAndSerial(username, machineSerial.trim());
 
     if (!user) {
       // Log failed attempt
@@ -67,6 +75,16 @@ const syncUser = async (req, res) => {
     // Log successful sync
     logSync(user.id, ipAddress, 'no-device-check', true);
 
+    // Log address info for debugging
+    console.log(`📍 User address from DB: "${user.address}" (type: ${typeof user.address})`);
+    
+    // Ensure address is properly handled
+    const userAddress = user.address !== undefined && user.address !== null && user.address !== '' 
+      ? String(user.address).trim() 
+      : null;
+    
+    console.log(`📍 Processed address: "${userAddress}"`);
+
     // Return user data with plain text password
     res.json({
       success: true,
@@ -74,7 +92,8 @@ const syncUser = async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        password: password  // Return plain text password instead of hash
+        password: password, // Return plain text password instead of hash
+        address: userAddress
       }
     });
   } catch (error) {
