@@ -191,7 +191,7 @@ router.get('/device-access-logs', verifyToken, async (req, res) => {
 router.get('/agents', verifyToken, (req, res) => {
     try {
         const sql = `
-            SELECT id, name, telegram_id, address, credit_balance, is_active, created_at
+            SELECT id, name, telegram_id, address, phone, credit_balance, is_active, created_at
             FROM agents 
             ORDER BY created_at DESC
         `;
@@ -209,13 +209,13 @@ router.get('/agents', verifyToken, (req, res) => {
 
 router.post('/agents/add', verifyToken, (req, res) => {
     try {
-        const { name, telegramId, initialCredit, address } = req.body;
+        const { name, telegramId, initialCredit, address, phone } = req.body;
         if (!name || !telegramId) {
             return res.status(400).json({ success: false, message: 'Name and Telegram ID are required' });
         }
         
-        const sql = `INSERT INTO agents (name, telegram_id, address, credit_balance, is_active) VALUES (?, ?, ?, ?, ?)`;
-        db.run(sql, [name, telegramId, address ? address.trim() : null, parseFloat(initialCredit) || 0, true], function(err) {
+        const sql = `INSERT INTO agents (name, telegram_id, address, phone, credit_balance, is_active) VALUES (?, ?, ?, ?, ?, ?)`;
+        db.run(sql, [name, telegramId, address ? address.trim() : null, phone ? phone.trim() : null, parseFloat(initialCredit) || 0, true], function(err) {
             if (err) {
                 if (err.code === 'SQLITE_CONSTRAINT' || err.code === '23505') {
                     return res.status(400).json({ success: false, message: 'Agent with this Telegram ID already exists' });
@@ -226,6 +226,77 @@ router.post('/agents/add', verifyToken, (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update agent information (address and phone)
+router.put('/agents/:id', verifyToken, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { address, phone } = req.body;
+
+        // Only address and phone can be updated - name and telegram_id are read-only for security
+        const trimmedAddress = address ? address.trim() : null;
+        const trimmedPhone = phone ? phone.trim() : null;
+
+        // Try to update both address and phone, with fallback for missing phone column
+        const updateWithPhoneSql = 'UPDATE agents SET address = ?, phone = ? WHERE id = ?';
+        const updateAddressOnlySql = 'UPDATE agents SET address = ? WHERE id = ?';
+
+        // First try with phone column
+        db.run(updateWithPhoneSql, [trimmedAddress, trimmedPhone, id], function(err) {
+            if (err && err.message.includes('no such column: phone')) {
+                // Phone column doesn't exist, fallback to address only
+                console.log('⚠️ Phone column not found in agents table, updating address only');
+                
+                db.run(updateAddressOnlySql, [trimmedAddress, id], function(fallbackErr) {
+                    if (fallbackErr) {
+                        console.error('Database error updating agent (fallback):', fallbackErr);
+                        return res.status(500).json({
+                            success: false,
+                            message: 'Database error'
+                        });
+                    }
+
+                    if (this.changes === 0) {
+                        return res.status(404).json({
+                            success: false,
+                            message: 'Agent not found'
+                        });
+                    }
+
+                    res.json({
+                        success: true,
+                        message: 'Agent address updated successfully (phone not supported)'
+                    });
+                });
+            } else if (err) {
+                console.error('Database error updating agent:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error'
+                });
+            } else {
+                if (this.changes === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Agent not found'
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    message: 'Agent information updated successfully'
+                });
+            }
+        });
+
+    } catch (error) {
+        console.error('Update agent error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
     }
 });
 

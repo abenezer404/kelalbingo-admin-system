@@ -365,6 +365,7 @@ const initDatabase = () => {
           name TEXT NOT NULL,
           telegram_id TEXT UNIQUE NOT NULL,
           address TEXT,
+          phone TEXT,
           credit_balance DECIMAL DEFAULT 0,
           is_active BOOLEAN DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -373,6 +374,9 @@ const initDatabase = () => {
         if (err) reject(err);
       });
       db.run(`ALTER TABLE agents ADD COLUMN address TEXT`, (err) => {
+        // Migration completed - column added or already exists
+      });
+      db.run(`ALTER TABLE agents ADD COLUMN phone TEXT`, (err) => {
         // Migration completed - column added or already exists
       });
 

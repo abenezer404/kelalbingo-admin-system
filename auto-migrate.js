@@ -20,7 +20,9 @@ async function autoMigrate() {
     try {
         const client = await pool.connect();
         
-        // Check and add phone column
+        // === PENDING_USERS TABLE MIGRATIONS ===
+        
+        // Check and add phone column to pending_users
         const phoneCheck = await client.query(`
             SELECT column_name FROM information_schema.columns 
             WHERE table_name = 'pending_users' AND column_name = 'phone'
@@ -28,10 +30,10 @@ async function autoMigrate() {
         
         if (phoneCheck.rows.length === 0) {
             await client.query('ALTER TABLE pending_users ADD COLUMN phone VARCHAR(20) DEFAULT NULL');
-            console.log('✅ Phone column added to production database');
+            console.log('✅ Phone column added to pending_users table');
         }
         
-        // Check and add address column
+        // Check and add address column to pending_users
         const addressCheck = await client.query(`
             SELECT column_name FROM information_schema.columns 
             WHERE table_name = 'pending_users' AND column_name = 'address'
@@ -39,13 +41,39 @@ async function autoMigrate() {
         
         if (addressCheck.rows.length === 0) {
             await client.query('ALTER TABLE pending_users ADD COLUMN address VARCHAR(255) DEFAULT NULL');
-            console.log('✅ Address column added to production database');
+            console.log('✅ Address column added to pending_users table');
+        }
+        
+        // === AGENTS TABLE MIGRATIONS ===
+        
+        // Check and add phone column to agents
+        const agentPhoneCheck = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'agents' AND column_name = 'phone'
+        `);
+        
+        if (agentPhoneCheck.rows.length === 0) {
+            await client.query('ALTER TABLE agents ADD COLUMN phone VARCHAR(20) DEFAULT NULL');
+            console.log('✅ Phone column added to agents table');
+        }
+        
+        // Check and add address column to agents (should exist but verify)
+        const agentAddressCheck = await client.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'agents' AND column_name = 'address'
+        `);
+        
+        if (agentAddressCheck.rows.length === 0) {
+            await client.query('ALTER TABLE agents ADD COLUMN address VARCHAR(255) DEFAULT NULL');
+            console.log('✅ Address column added to agents table');
         }
         
         // Create indexes silently
         try {
             await client.query('CREATE INDEX IF NOT EXISTS idx_pending_users_phone ON pending_users(phone)');
             await client.query('CREATE INDEX IF NOT EXISTS idx_pending_users_address ON pending_users(address)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_agents_phone ON agents(phone)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_agents_address ON agents(address)');
         } catch (e) {
             // Ignore index errors
         }
