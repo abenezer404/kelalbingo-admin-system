@@ -155,7 +155,6 @@ router.delete('/devices/:serial', verifyToken, (req, res) => {
 
 router.get('/device-access-logs', verifyToken, async (req, res) => {
     try {
-        // Use direct database query for compatibility
         const sql = `
             SELECT device_serial, device_fingerprint, success, message, accessed_at
             FROM device_access_logs 
@@ -163,7 +162,6 @@ router.get('/device-access-logs', verifyToken, async (req, res) => {
             LIMIT 100
         `;
         
-        // Use callback-style query for compatibility with our database wrapper
         db.all(sql, [], (err, logs) => {
             if (err) {
                 console.error('Database error:', err);
@@ -191,15 +189,12 @@ router.get('/device-access-logs', verifyToken, async (req, res) => {
 router.get('/agents', verifyToken, (req, res) => {
     try {
         const sql = `
-            SELECT id, name, telegram_id, address, phone, credit_balance, is_active, created_at
+            SELECT id, name, telegram_id, credit_balance, is_active, created_at
             FROM agents 
             ORDER BY created_at DESC
         `;
         db.all(sql, [], (err, agents) => {
-            if (err) {
-                console.error('Database error in /agents:', err);
-                return res.status(500).json({ success: false, message: 'Database error' });
-            }
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
             res.json({ success: true, agents: agents || [] });
         });
     } catch (error) {
@@ -209,13 +204,13 @@ router.get('/agents', verifyToken, (req, res) => {
 
 router.post('/agents/add', verifyToken, (req, res) => {
     try {
-        const { name, telegramId, initialCredit, address, phone } = req.body;
+        const { name, telegramId, initialCredit } = req.body;
         if (!name || !telegramId) {
             return res.status(400).json({ success: false, message: 'Name and Telegram ID are required' });
         }
         
-        const sql = `INSERT INTO agents (name, telegram_id, address, phone, credit_balance, is_active) VALUES (?, ?, ?, ?, ?, ?)`;
-        db.run(sql, [name, telegramId, address ? address.trim() : null, phone ? phone.trim() : null, parseFloat(initialCredit) || 0, true], function(err) {
+        const sql = `INSERT INTO agents (name, telegram_id, credit_balance, is_active) VALUES (?, ?, ?, ?)`;
+        db.run(sql, [name, telegramId, parseFloat(initialCredit) || 0, true], function(err) {
             if (err) {
                 if (err.code === 'SQLITE_CONSTRAINT' || err.code === '23505') {
                     return res.status(400).json({ success: false, message: 'Agent with this Telegram ID already exists' });
@@ -226,77 +221,6 @@ router.post('/agents/add', verifyToken, (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
-    }
-});
-
-// Update agent information (address and phone)
-router.put('/agents/:id', verifyToken, (req, res) => {
-    try {
-        const { id } = req.params;
-        const { address, phone } = req.body;
-
-        // Only address and phone can be updated - name and telegram_id are read-only for security
-        const trimmedAddress = address ? address.trim() : null;
-        const trimmedPhone = phone ? phone.trim() : null;
-
-        // Try to update both address and phone, with fallback for missing phone column
-        const updateWithPhoneSql = 'UPDATE agents SET address = ?, phone = ? WHERE id = ?';
-        const updateAddressOnlySql = 'UPDATE agents SET address = ? WHERE id = ?';
-
-        // First try with phone column
-        db.run(updateWithPhoneSql, [trimmedAddress, trimmedPhone, id], function(err) {
-            if (err && err.message.includes('no such column: phone')) {
-                // Phone column doesn't exist, fallback to address only
-                console.log('⚠️ Phone column not found in agents table, updating address only');
-                
-                db.run(updateAddressOnlySql, [trimmedAddress, id], function(fallbackErr) {
-                    if (fallbackErr) {
-                        console.error('Database error updating agent (fallback):', fallbackErr);
-                        return res.status(500).json({
-                            success: false,
-                            message: 'Database error'
-                        });
-                    }
-
-                    if (this.changes === 0) {
-                        return res.status(404).json({
-                            success: false,
-                            message: 'Agent not found'
-                        });
-                    }
-
-                    res.json({
-                        success: true,
-                        message: 'Agent address updated successfully (phone not supported)'
-                    });
-                });
-            } else if (err) {
-                console.error('Database error updating agent:', err);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database error'
-                });
-            } else {
-                if (this.changes === 0) {
-                    return res.status(404).json({
-                        success: false,
-                        message: 'Agent not found'
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    message: 'Agent information updated successfully'
-                });
-            }
-        });
-
-    } catch (error) {
-        console.error('Update agent error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error'
-        });
     }
 });
 
@@ -385,13 +309,178 @@ router.get('/agents/:id/transactions', verifyToken, (req, res) => {
     }
 });
 
+// Agent Management routes
+router.get('/agents', verifyToken, (req, res) => {
+    try {
+        const sql = `
+            SELECT id, name, telegram_id, address, phone, credit_balance, is_active, created_at
+            FROM agents 
+            ORDER BY created_at DESC
+        `;
+        db.all(sql, [], (err, agents) => {
+            if (err) {
+                console.error('Database error in /agents:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            res.json({ success: true, agents: agents || [] });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/agents/add', verifyToken, (req, res) => {
+    try {
+        const { name, telegramId, initialCredit, address, phone } = req.body;
+        if (!name || !telegramId) {
+            return res.status(400).json({ success: false, message: 'Name and Telegram ID are required' });
+        }
+        
+        const sql = `INSERT INTO agents (name, telegram_id, address, phone, credit_balance, is_active) VALUES (?, ?, ?, ?, ?, ?)`;
+        db.run(sql, [name, telegramId, address ? address.trim() : null, phone ? phone.trim() : null, parseFloat(initialCredit) || 0, true], function(err) {
+            if (err) {
+                if (err.code === 'SQLITE_CONSTRAINT' || err.code === '23505') {
+                    return res.status(400).json({ success: false, message: 'Agent with this Telegram ID already exists' });
+                }
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            res.json({ success: true, message: 'Agent added successfully', agentId: this.lastID });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update agent information (address and phone)
+router.put('/agents/:id', verifyToken, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { address, phone } = req.body;
+
+        const trimmedAddress = address ? address.trim() : null;
+        const trimmedPhone = phone ? phone.trim() : null;
+
+        const updateWithPhoneSql = 'UPDATE agents SET address = ?, phone = ? WHERE id = ?';
+        const updateAddressOnlySql = 'UPDATE agents SET address = ? WHERE id = ?';
+
+        db.run(updateWithPhoneSql, [trimmedAddress, trimmedPhone, id], function(err) {
+            if (err && err.message.includes('no such column: phone')) {
+                console.log('⚠️ Phone column not found in agents table, updating address only');
+                
+                db.run(updateAddressOnlySql, [trimmedAddress, id], function(fallbackErr) {
+                    if (fallbackErr) {
+                        console.error('Database error updating agent (fallback):', fallbackErr);
+                        return res.status(500).json({ success: false, message: 'Database error' });
+                    }
+
+                    if (this.changes === 0) {
+                        return res.status(404).json({ success: false, message: 'Agent not found' });
+                    }
+
+                    res.json({ success: true, message: 'Agent address updated successfully (phone not supported)' });
+                });
+            } else if (err) {
+                console.error('Database error updating agent:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            } else {
+                if (this.changes === 0) {
+                    return res.status(404).json({ success: false, message: 'Agent not found' });
+                }
+                res.json({ success: true, message: 'Agent information updated successfully' });
+            }
+        });
+    } catch (error) {
+        console.error('Update agent error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/agents/:id/fund', verifyToken, (req, res) => {
+    try {
+        const { amount } = req.body;
+        const agentId = req.params.id;
+        if (!amount || isNaN(amount)) {
+            return res.status(400).json({ success: false, message: 'Valid amount is required' });
+        }
+        
+        const sql = `UPDATE agents SET credit_balance = credit_balance + ? WHERE id = ?`;
+        db.run(sql, [parseFloat(amount), agentId], function(err) {
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            
+            const logSql = `INSERT INTO agent_transactions (agent_id, transaction_type, amount, description) VALUES (?, ?, ?, ?)`;
+            db.run(logSql, [agentId, 'fund', parseFloat(amount), 'Manual funding by admin'], (logErr) => {
+                if (logErr) console.error('Error logging agent transaction:', logErr);
+            });
+            
+            res.json({ success: true, message: 'Agent funded successfully' });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/agents/:id/deduct', verifyToken, (req, res) => {
+    try {
+        const { amount } = req.body;
+        const agentId = req.params.id;
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Valid positive amount is required' });
+        }
+        
+        db.get('SELECT credit_balance FROM agents WHERE id = ?', [agentId], (err, agent) => {
+            if (err) return res.status(500).json({ success: false, message: 'Database error' });
+            if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+            
+            if (agent.credit_balance < amount) {
+                return res.status(400).json({ success: false, message: 'Insufficient agent balance' });
+            }
+
+            const sql = `UPDATE agents SET credit_balance = credit_balance - ? WHERE id = ?`;
+            db.run(sql, [parseFloat(amount), agentId], function(err) {
+                if (err) return res.status(500).json({ success: false, message: 'Database error' });
+                
+                const logSql = `INSERT INTO agent_transactions (agent_id, transaction_type, amount, description) VALUES (?, ?, ?, ?)`;
+                db.run(logSql, [agentId, 'deduct', parseFloat(amount), 'Manual deduction by admin'], (logErr) => {
+                    if (logErr) console.error('Error logging agent transaction:', logErr);
+                });
+                
+                res.json({ success: true, message: 'Balance deducted successfully' });
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.get('/agents/:id/transactions', verifyToken, (req, res) => {
+    try {
+        const agentId = req.params.id;
+        const sql = `
+            SELECT t.*, u.username as target_username
+            FROM agent_transactions t
+            LEFT JOIN pending_users u ON t.target_user_id = u.id
+            WHERE t.agent_id = ?
+            ORDER BY t.created_at DESC
+            LIMIT 100
+        `;
+        db.all(sql, [agentId], (err, logs) => {
+            if (err) {
+                console.error('Error fetching agent logs:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            res.json({ success: true, logs: logs || [] });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 // Agent transfer balance to user (with address validation)
 router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
     try {
         const { agentId } = req.params;
         const { targetUsername, amount, description } = req.body;
 
-        // Validate input
         if (!targetUsername || !amount || isNaN(amount) || amount <= 0) {
             return res.status(400).json({
                 success: false,
@@ -399,7 +488,6 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
             });
         }
 
-        // Get agent information
         db.get('SELECT * FROM agents WHERE id = ? AND is_active = 1', [agentId], (err, agent) => {
             if (err) {
                 return res.status(500).json({ success: false, message: 'Database error' });
@@ -409,7 +497,6 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                 return res.status(404).json({ success: false, message: 'Agent not found or inactive' });
             }
 
-            // Check if agent has sufficient balance
             if (agent.credit_balance < amount) {
                 return res.status(400).json({
                     success: false,
@@ -417,7 +504,6 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                 });
             }
 
-            // Get target user information
             db.get('SELECT * FROM pending_users WHERE username = ?', [targetUsername], (userErr, targetUser) => {
                 if (userErr) {
                     return res.status(500).json({ success: false, message: 'Database error' });
@@ -430,7 +516,6 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                     });
                 }
 
-                // ADDRESS VALIDATION: Check if agent and user have the same address
                 const agentAddress = agent.address ? agent.address.trim().toLowerCase() : '';
                 const userAddress = targetUser.address ? targetUser.address.trim().toLowerCase() : '';
 
@@ -448,11 +533,9 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                     });
                 }
 
-                // All validations passed, proceed with transfer
                 db.serialize(() => {
                     db.run('BEGIN TRANSACTION');
 
-                    // Deduct from agent balance
                     db.run('UPDATE agents SET credit_balance = credit_balance - ? WHERE id = ?', 
                         [parseFloat(amount), agentId], function(agentUpdateErr) {
                         if (agentUpdateErr) {
@@ -460,54 +543,21 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                             return res.status(500).json({ success: false, message: 'Failed to update agent balance' });
                         }
 
-                        // Add to user balance (assuming user_balances table exists)
                         db.run('INSERT OR REPLACE INTO user_balances (user_id, current_balance, last_updated) VALUES (?, COALESCE((SELECT current_balance FROM user_balances WHERE user_id = ?), 0) + ?, CURRENT_TIMESTAMP)',
                             [targetUser.id, targetUser.id, parseFloat(amount)], function(userUpdateErr) {
+                            
                             if (userUpdateErr) {
-                                // If user_balances table doesn't exist, try adding to user_packages instead
-                                console.log('⚠️ user_balances table not found, adding to user_packages');
+                                console.log('⚠️ user_balances table not found, using user_packages only');
                             }
                             
-                            // Always add to user_packages for agent transfers (for desktop app sync)
                             db.run('INSERT INTO user_packages (user_id, amount, assigned_by, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
                                 [targetUser.id, parseFloat(amount), `Agent Transfer from ${agent.name}`], function(packageErr) {
                                 
-                                if (userUpdateErr && packageErr) {
-                                    // Both operations failed
+                                if (packageErr) {
                                     db.run('ROLLBACK');
-                                    return res.status(500).json({ success: false, message: 'Failed to update user balance' });
+                                    return res.status(500).json({ success: false, message: 'Failed to create user package record' });
                                 }
 
-                                    // Log the transaction
-                                    db.run('INSERT INTO agent_transactions (agent_id, transaction_type, amount, target_user_id, description) VALUES (?, ?, ?, ?, ?)',
-                                        [agentId, 'transfer', parseFloat(amount), targetUser.id, description || `Transfer to ${targetUsername}`], function(logErr) {
-                                        if (logErr) {
-                                            db.run('ROLLBACK');
-                                            return res.status(500).json({ success: false, message: 'Failed to log transaction' });
-                                        }
-
-                                        // Commit transaction
-                                        db.run('COMMIT', (commitErr) => {
-                                            if (commitErr) {
-                                                return res.status(500).json({ success: false, message: 'Transaction commit failed' });
-                                            }
-
-                                            res.json({
-                                                success: true,
-                                                message: `Successfully transferred ${amount} ብር to ${targetUsername}`,
-                                                transaction: {
-                                                    agentId: agentId,
-                                                    targetUser: targetUsername,
-                                                    amount: parseFloat(amount),
-                                                    agentAddress: agent.address,
-                                                    userAddress: targetUser.address
-                                                }
-                                            });
-                                        });
-                                    });
-                                });
-                            } else {
-                                // Log the transaction
                                 db.run('INSERT INTO agent_transactions (agent_id, transaction_type, amount, target_user_id, description) VALUES (?, ?, ?, ?, ?)',
                                     [agentId, 'transfer', parseFloat(amount), targetUser.id, description || `Transfer to ${targetUsername}`], function(logErr) {
                                     if (logErr) {
@@ -515,7 +565,6 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                                         return res.status(500).json({ success: false, message: 'Failed to log transaction' });
                                     }
 
-                                    // Commit transaction
                                     db.run('COMMIT', (commitErr) => {
                                         if (commitErr) {
                                             return res.status(500).json({ success: false, message: 'Transaction commit failed' });
@@ -523,7 +572,7 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
 
                                         res.json({
                                             success: true,
-                                            message: `Successfully transferred ${amount} ብր to ${targetUsername}`,
+                                            message: `Successfully transferred ${amount} ብር to ${targetUsername}`,
                                             transaction: {
                                                 agentId: agentId,
                                                 targetUser: targetUsername,
@@ -534,7 +583,7 @@ router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
                                         });
                                     });
                                 });
-                            }
+                            });
                         });
                     });
                 });
