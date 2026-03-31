@@ -94,7 +94,7 @@ const syncUser = async (req, res) => {
         username: user.username,
         password: password, // Return plain text password instead of hash
         address: userAddress,
-        phone: user.phone || null, // Include phone number
+        phone: null, // Phone column doesn't exist in production, return null
         updated_at: user.created_at // Use created_at since updated_at doesn't exist in production
       }
     });
@@ -428,9 +428,8 @@ const checkUserUpdates = async (req, res) => {
             ? String(user.address).trim()
             : null;
 
-        const userPhone = user.phone !== undefined && user.phone !== null && user.phone !== ''
-            ? String(user.phone).trim()
-            : null;
+        // Phone column doesn't exist in production database
+        const userPhone = null;
 
         // For now, always indicate an update is available to ensure sync works
         // This can be optimized later when proper timestamp tracking is added
@@ -454,20 +453,19 @@ const checkUserUpdates = async (req, res) => {
         });
     }
 };
-// Update user data (address and phone - username is read-only)
+// Update user data (address only - phone column doesn't exist in production)
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { address, phone } = req.body;
 
-        // Only address and phone can be updated - username is read-only for security
+        // Only address can be updated - phone column doesn't exist in production database
         const trimmedAddress = address ? address.trim() : null;
-        const trimmedPhone = phone ? phone.trim() : null;
 
-        // Update address and phone fields
-        const updateSql = 'UPDATE pending_users SET address = ?, phone = ? WHERE id = ?';
+        // Update only address field (phone column doesn't exist in production)
+        const updateSql = 'UPDATE pending_users SET address = ? WHERE id = ?';
 
-        db.run(updateSql, [trimmedAddress, trimmedPhone, id], function(err) {
+        db.run(updateSql, [trimmedAddress, id], function(err) {
             if (err) {
                 console.error('Database error updating user:', err);
                 return res.status(500).json({
@@ -485,7 +483,7 @@ const updateUser = async (req, res) => {
 
             res.json({
                 success: true,
-                message: 'User information updated successfully'
+                message: 'User address updated successfully'
             });
         });
 
