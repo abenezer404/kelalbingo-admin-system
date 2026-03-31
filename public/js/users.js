@@ -110,7 +110,7 @@ function displayUsers(users) {
             <td>${createdAt}</td>
             <td>${status}</td>
             <td>
-              <button class="btn btn-primary btn-sm edit-user-btn" data-user-id="${user.id}" data-username="${user.username}" data-address="${user.address || ''}">Edit</button>
+              <button class="btn btn-primary btn-sm edit-user-btn" data-user-id="${user.id}" data-username="${user.username}" data-address="${user.address || ''}">Edit Address</button>
               <button class="btn btn-warning btn-sm reset-password-btn" data-user-id="${user.id}" data-username="${user.username}">Reset Password</button>
               <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="${user.id}" data-username="${user.username}">Delete</button>
             </td>
@@ -227,18 +227,22 @@ async function editUser(id, currentUsername, currentAddress) {
                 <form id="editUserForm">
                     <div style="margin-bottom: 20px;">
                         <label for="editUsername" style="display: block; margin-bottom: 5px; font-weight: bold;">Username:</label>
-                        <input type="text" id="editUsername" value="${currentUsername}" required style="
+                        <input type="text" id="editUsername" value="${currentUsername}" readonly style="
                             width: 100%;
                             padding: 10px;
                             border: 1px solid #ddd;
                             border-radius: 5px;
                             font-size: 16px;
                             box-sizing: border-box;
+                            background-color: #f5f5f5;
+                            color: #666;
+                            cursor: not-allowed;
                         ">
+                        <small style="color: #666; font-style: italic;">Username cannot be changed for security reasons</small>
                     </div>
                     <div style="margin-bottom: 20px;">
                         <label for="editAddress" style="display: block; margin-bottom: 5px; font-weight: bold;">Address:</label>
-                        <input type="text" id="editAddress" value="${currentAddress}" placeholder="Optional address" style="
+                        <input type="text" id="editAddress" value="${currentAddress}" placeholder="Enter user address" style="
                             width: 100%;
                             padding: 10px;
                             border: 1px solid #ddd;
@@ -266,7 +270,7 @@ async function editUser(id, currentUsername, currentAddress) {
                             border-radius: 5px;
                             cursor: pointer;
                             font-size: 16px;
-                        ">Update User</button>
+                        ">Update Address</button>
                     </div>
                 </form>
             </div>
@@ -280,22 +284,15 @@ async function editUser(id, currentUsername, currentAddress) {
     document.getElementById('editUserForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const newUsername = document.getElementById('editUsername').value.trim();
         const newAddress = document.getElementById('editAddress').value.trim();
-
-        if (!newUsername) {
-            showMessage('editMessage', 'Username is required', 'error');
-            return;
-        }
 
         try {
             const response = await apiRequest(`/admin/users/${id}`, 'PUT', {
-                username: newUsername,
                 address: newAddress || null
             });
 
             if (response.success) {
-                showMessage('editMessage', 'User updated successfully!', 'success');
+                showMessage('editMessage', 'User address updated successfully!', 'success');
                 setTimeout(() => {
                     closeEditModal();
                     loadUsers(); // Refresh the user list

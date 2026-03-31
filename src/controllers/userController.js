@@ -448,41 +448,19 @@ const checkUserUpdates = async (req, res) => {
         });
     }
 };
-// Update user data (username and address)
+// Update user data (address only - username is read-only)
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { username, address } = req.body;
+        const { address } = req.body;
 
-        if (!username || username.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'Username is required'
-            });
-        }
-
-        const trimmedUsername = username.trim();
+        // Only address can be updated - username is read-only for security
         const trimmedAddress = address ? address.trim() : null;
 
-        // Check if username already exists for another user
-        const existingUser = await new Promise((resolve, reject) => {
-            db.get('SELECT id FROM pending_users WHERE username = ? AND id != ?', [trimmedUsername, id], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        // Update only the address field
+        const updateSql = 'UPDATE pending_users SET address = ? WHERE id = ?';
 
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'Username already exists'
-            });
-        }
-
-        // Update user data (without updated_at since column doesn't exist in production)
-        const updateSql = 'UPDATE pending_users SET username = ?, address = ? WHERE id = ?';
-
-        db.run(updateSql, [trimmedUsername, trimmedAddress, id], function(err) {
+        db.run(updateSql, [trimmedAddress, id], function(err) {
             if (err) {
                 console.error('Database error updating user:', err);
                 return res.status(500).json({
@@ -500,7 +478,7 @@ const updateUser = async (req, res) => {
 
             res.json({
                 success: true,
-                message: 'User updated successfully'
+                message: 'User address updated successfully'
             });
         });
 
