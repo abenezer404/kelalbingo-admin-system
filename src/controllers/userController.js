@@ -85,7 +85,7 @@ const syncUser = async (req, res) => {
     
     console.log(`📍 Processed address: "${userAddress}"`);
 
-    // Return user data with plain text password
+    // Return user data with plain text password and update timestamp
     res.json({
       success: true,
       message: 'User synced successfully',
@@ -93,7 +93,8 @@ const syncUser = async (req, res) => {
         id: user.id,
         username: user.username,
         password: password, // Return plain text password instead of hash
-        address: userAddress
+        address: userAddress,
+        updated_at: user.updated_at || user.created_at // Include when user was last updated
       }
     });
   } catch (error) {
@@ -398,6 +399,66 @@ const updateUserPassword = async (req, res) => {
     });
   }
 };
+// Check if user data has been updated since last sync
+const checkUserUpdates = async (req, res) => {
+    try {
+        const { username, machineSerial, lastSyncTime } = req.body;
+
+        if (!username || !machineSerial) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username and machine serial are required'
+            });
+        }
+
+        // Get user from database
+        const user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if user has been updated since last sync
+        const userUpdatedAt = new Date(user.updated_at || user.created_at);
+        const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
+
+        const needsUpdate = userUpdatedAt > lastSync;
+
+        if (needsUpdate) {
+            // Return updated user data
+            const userAddress = user.address !== undefined && user.address !== null && user.address !== ''
+                ? String(user.address).trim()
+                : null;
+
+            res.json({
+                success: true,
+                needsUpdate: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    address: userAddress,
+                    updated_at: user.updated_at || user.created_at
+                }
+            });
+        } else {
+            res.json({
+                success: true,
+                needsUpdate: false,
+                message: 'User data is up to date'
+            });
+        }
+
+    } catch (error) {
+        console.error('Check user updates error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+};
 // Update user data (username and address)
 const updateUser = async (req, res) => {
     try {
@@ -430,7 +491,7 @@ const updateUser = async (req, res) => {
         }
 
         // Update user data
-        const updateSql = 'UPDATE pending_users SET username = ?, address = ? WHERE id = ?';
+        const updateSql = 'UPDATE pending_users SET username = ?, address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
 
         db.run(updateSql, [trimmedUsername, trimmedAddress, id], function(err) {
             if (err) {
@@ -534,6 +595,7 @@ module.exports = {
   deleteUser,
   getStats,
   updateUser,
+  checkUserUpdates,
   updateUserPassword,
   getPasswordResetLogs
 };
