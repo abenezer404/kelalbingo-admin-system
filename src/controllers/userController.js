@@ -398,6 +398,71 @@ const updateUserPassword = async (req, res) => {
     });
   }
 };
+// Update user data (username and address)
+const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, address } = req.body;
+
+        if (!username || username.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Username is required'
+            });
+        }
+
+        const trimmedUsername = username.trim();
+        const trimmedAddress = address ? address.trim() : null;
+
+        // Check if username already exists for another user
+        const existingUser = await new Promise((resolve, reject) => {
+            db.get('SELECT id FROM pending_users WHERE username = ? AND id != ?', [trimmedUsername, id], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username already exists'
+            });
+        }
+
+        // Update user data
+        const updateSql = 'UPDATE pending_users SET username = ?, address = ? WHERE id = ?';
+
+        db.run(updateSql, [trimmedUsername, trimmedAddress, id], function(err) {
+            if (err) {
+                console.error('Database error updating user:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error'
+                });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'User updated successfully'
+            });
+        });
+
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+};
+
 
 /**
  * Get password reset logs (admin only)
@@ -468,6 +533,7 @@ module.exports = {
   listUsers,
   deleteUser,
   getStats,
+  updateUser,
   updateUserPassword,
   getPasswordResetLogs
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middleware/auth');
 const { login, verifyOTP, changePassword, requestPasswordChangeOTP, updateActivity, getSessionConfig } = require('../controllers/authController');
-const { createUser, listUsers, deleteUser, getStats, updateUserPassword, getPasswordResetLogs } = require('../controllers/userController');
+const { createUser, listUsers, deleteUser, getStats, updateUser, updateUserPassword, getPasswordResetLogs } = require('../controllers/userController');
 const { getPackages, assignPackage, getUserPackages, getBalanceSyncLogs, getPackageAssignments, adjustBalance, cancelPendingPackage } = require('../controllers/packageController');
 const { db } = require('../config/database');
 const databaseService = require('../services/databaseService');
@@ -14,6 +14,7 @@ router.post('/verify-otp', verifyOTP);
 // Protected routes (require JWT token)
 router.get('/users', verifyToken, listUsers);
 router.post('/users/create', verifyToken, createUser);
+router.put('/users/:id', verifyToken, updateUser);
 router.put('/users/:id/password', verifyToken, updateUserPassword);
 router.delete('/users/:id', verifyToken, deleteUser);
 router.get('/stats', verifyToken, getStats);

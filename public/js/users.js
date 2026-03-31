@@ -110,6 +110,7 @@ function displayUsers(users) {
             <td>${createdAt}</td>
             <td>${status}</td>
             <td>
+              <button class="btn btn-primary btn-sm edit-user-btn" data-user-id="${user.id}" data-username="${user.username}" data-address="${user.address || ''}">Edit</button>
               <button class="btn btn-warning btn-sm reset-password-btn" data-user-id="${user.id}" data-username="${user.username}">Reset Password</button>
               <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="${user.id}" data-username="${user.username}">Delete</button>
             </td>
@@ -121,6 +122,15 @@ function displayUsers(users) {
     userList.innerHTML = html;
 
     // Add event listeners to dynamically created buttons
+    document.querySelectorAll('.edit-user-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const username = this.getAttribute('data-username');
+            const address = this.getAttribute('data-address');
+            editUser(userId, username, address);
+        });
+    });
+
     document.querySelectorAll('.reset-password-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user-id');
@@ -187,5 +197,131 @@ async function deleteUser(id, username) {
         }
     } catch (error) {
         await showError('Error deleting user', 'Network Error');
+    }
+}
+
+async function editUser(id, currentUsername, currentAddress) {
+    // Create a modal dialog for editing user data
+    const modalHtml = `
+        <div id="editUserModal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        ">
+            <div style="
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                width: 90%;
+                max-width: 500px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            ">
+                <h3 style="margin-top: 0; color: #333; text-align: center;">Edit User</h3>
+                <form id="editUserForm">
+                    <div style="margin-bottom: 20px;">
+                        <label for="editUsername" style="display: block; margin-bottom: 5px; font-weight: bold;">Username:</label>
+                        <input type="text" id="editUsername" value="${currentUsername}" required style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #ddd;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            box-sizing: border-box;
+                        ">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label for="editAddress" style="display: block; margin-bottom: 5px; font-weight: bold;">Address:</label>
+                        <input type="text" id="editAddress" value="${currentAddress}" placeholder="Optional address" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #ddd;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            box-sizing: border-box;
+                        ">
+                    </div>
+                    <div id="editMessage" class="message" style="margin-bottom: 15px;"></div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="cancelEditBtn" style="
+                            padding: 10px 20px;
+                            border: 1px solid #ddd;
+                            background: #f8f9fa;
+                            color: #333;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-size: 16px;
+                        ">Cancel</button>
+                        <button type="submit" style="
+                            padding: 10px 20px;
+                            border: none;
+                            background: #007bff;
+                            color: white;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-size: 16px;
+                        ">Update User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Handle form submission
+    document.getElementById('editUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const newUsername = document.getElementById('editUsername').value.trim();
+        const newAddress = document.getElementById('editAddress').value.trim();
+
+        if (!newUsername) {
+            showMessage('editMessage', 'Username is required', 'error');
+            return;
+        }
+
+        try {
+            const response = await apiRequest(`/admin/users/${id}`, 'PUT', {
+                username: newUsername,
+                address: newAddress || null
+            });
+
+            if (response.success) {
+                showMessage('editMessage', 'User updated successfully!', 'success');
+                setTimeout(() => {
+                    closeEditModal();
+                    loadUsers(); // Refresh the user list
+                }, 1500);
+            } else {
+                showMessage('editMessage', response.message || 'Failed to update user', 'error');
+            }
+        } catch (error) {
+            showMessage('editMessage', 'Error updating user', 'error');
+        }
+    });
+
+    // Handle cancel button
+    document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
+
+    // Handle clicking outside modal
+    document.getElementById('editUserModal').addEventListener('click', (e) => {
+        if (e.target.id === 'editUserModal') {
+            closeEditModal();
+        }
+    });
+
+    function closeEditModal() {
+        const modal = document.getElementById('editUserModal');
+        if (modal) {
+            modal.remove();
+        }
     }
 }
