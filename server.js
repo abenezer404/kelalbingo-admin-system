@@ -105,9 +105,11 @@ app.use((err, req, res, next) => {
 // Initialize database and start server
 async function startServer() {
   try {
-    // Step 1: Initialize database schema
+    // Step 1: Run auto-migration for production database
     if (process.env.DATABASE_URL) {
       console.log('🐘 Using PostgreSQL database...');
+      const { autoMigrate } = require('./auto-migrate');
+      await autoMigrate();
       await databaseService.init();
     } else {
       console.log('📊 Using SQLite database...');
