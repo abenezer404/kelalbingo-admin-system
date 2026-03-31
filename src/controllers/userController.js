@@ -85,7 +85,7 @@ const syncUser = async (req, res) => {
     
     console.log(`📍 Processed address: "${userAddress}"`);
 
-    // Return user data with plain text password and update timestamp
+    // Return user data with plain text password and creation timestamp
     res.json({
       success: true,
       message: 'User synced successfully',
@@ -94,7 +94,7 @@ const syncUser = async (req, res) => {
         username: user.username,
         password: password, // Return plain text password instead of hash
         address: userAddress,
-        updated_at: user.updated_at || user.created_at // Include when user was last updated
+        updated_at: user.created_at // Use created_at since updated_at doesn't exist in production
       }
     });
   } catch (error) {
@@ -421,35 +421,24 @@ const checkUserUpdates = async (req, res) => {
             });
         }
 
-        // Check if user has been updated since last sync
-        const userUpdatedAt = new Date(user.updated_at || user.created_at);
-        const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
+        // Since updated_at doesn't exist in production, we'll use a simpler approach:
+        // Always return the current user data for now (can be enhanced later)
+        const userAddress = user.address !== undefined && user.address !== null && user.address !== ''
+            ? String(user.address).trim()
+            : null;
 
-        const needsUpdate = userUpdatedAt > lastSync;
-
-        if (needsUpdate) {
-            // Return updated user data
-            const userAddress = user.address !== undefined && user.address !== null && user.address !== ''
-                ? String(user.address).trim()
-                : null;
-
-            res.json({
-                success: true,
-                needsUpdate: true,
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    address: userAddress,
-                    updated_at: user.updated_at || user.created_at
-                }
-            });
-        } else {
-            res.json({
-                success: true,
-                needsUpdate: false,
-                message: 'User data is up to date'
-            });
-        }
+        // For now, always indicate an update is available to ensure sync works
+        // This can be optimized later when proper timestamp tracking is added
+        res.json({
+            success: true,
+            needsUpdate: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                address: userAddress,
+                updated_at: user.created_at // Use created_at since updated_at doesn't exist
+            }
+        });
 
     } catch (error) {
         console.error('Check user updates error:', error);
@@ -490,8 +479,8 @@ const updateUser = async (req, res) => {
             });
         }
 
-        // Update user data
-        const updateSql = 'UPDATE pending_users SET username = ?, address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+        // Update user data (without updated_at since column doesn't exist in production)
+        const updateSql = 'UPDATE pending_users SET username = ?, address = ? WHERE id = ?';
 
         db.run(updateSql, [trimmedUsername, trimmedAddress, id], function(err) {
             if (err) {
