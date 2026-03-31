@@ -403,7 +403,7 @@ const updateUserPassword = async (req, res) => {
 // Check if user data has been updated since last sync
 const checkUserUpdates = async (req, res) => {
     try {
-        const { username, machineSerial, lastSyncTime } = req.body;
+        const { username, machineSerial, currentAddress, currentPhone } = req.body;
 
         if (!username || !machineSerial) {
             return res.status(400).json({
@@ -422,27 +422,42 @@ const checkUserUpdates = async (req, res) => {
             });
         }
 
-        // Since updated_at doesn't exist in production, we'll use a simpler approach:
-        // Always return the current user data for now (can be enhanced later)
-        const userAddress = user.address !== undefined && user.address !== null && user.address !== ''
+        // Prepare server data
+        const serverAddress = user.address !== undefined && user.address !== null && user.address !== ''
             ? String(user.address).trim()
             : null;
 
-        // Include phone if column exists, null otherwise
-        const userPhone = user.phone !== undefined && user.phone !== null && user.phone !== ''
+        const serverPhone = user.phone !== undefined && user.phone !== null && user.phone !== ''
             ? String(user.phone).trim()
             : null;
 
-        // For now, always indicate an update is available to ensure sync works
-        // This can be optimized later when proper timestamp tracking is added
+        // Normalize current data from client
+        const clientAddress = currentAddress && String(currentAddress).trim() !== '' 
+            ? String(currentAddress).trim() 
+            : null;
+            
+        const clientPhone = currentPhone && String(currentPhone).trim() !== '' 
+            ? String(currentPhone).trim() 
+            : null;
+
+        // Compare server data with client data to determine if update is needed
+        const addressChanged = serverAddress !== clientAddress;
+        const phoneChanged = serverPhone !== clientPhone;
+        const needsUpdate = addressChanged || phoneChanged;
+
+        console.log(`📋 Update check for ${username}:`);
+        console.log(`   Server address: "${serverAddress}" | Client address: "${clientAddress}" | Changed: ${addressChanged}`);
+        console.log(`   Server phone: "${serverPhone}" | Client phone: "${clientPhone}" | Changed: ${phoneChanged}`);
+        console.log(`   Update needed: ${needsUpdate}`);
+
         res.json({
             success: true,
-            needsUpdate: true,
+            needsUpdate: needsUpdate,
             user: {
                 id: user.id,
                 username: user.username,
-                address: userAddress,
-                phone: userPhone,
+                address: serverAddress,
+                phone: serverPhone,
                 updated_at: user.created_at // Use created_at since updated_at doesn't exist
             }
         });
