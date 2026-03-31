@@ -95,6 +95,7 @@ class User {
           pu.id, 
           pu.username, 
           pu.address,
+          pu.phone,
           pu.machine_serial, 
           pu.created_at, 
           pu.expires_at, 
