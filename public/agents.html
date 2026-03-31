@@ -73,6 +73,13 @@
             font-size: 12px;
         }
 
+        .btn-success {
+            background: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
         .btn-danger {
             background: #dc3545;
             color: white;
@@ -148,6 +155,11 @@
         .type-deduct {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        .type-transfer {
+            background: #d1ecf1;
+            color: #0c5460;
         }
     </style>
 </head>
@@ -357,6 +369,7 @@
                     <td>${new Date(agent.created_at).toLocaleDateString()}</td>
                     <td>
                         <button class="btn btn-sm btn-primary edit-agent-btn" data-id="${agent.id}" data-name="${agent.name}" data-address="${agent.address || ''}" data-phone="${agent.phone || ''}">Edit Info</button>
+                        <button class="btn btn-sm btn-success transfer-balance-btn" data-id="${agent.id}" data-name="${agent.name}" data-address="${agent.address || ''}" data-balance="${agent.credit_balance}">Transfer</button>
                         <button class="btn btn-sm btn-primary fund-agent-btn" data-id="${agent.id}" data-name="${agent.name}">Fund</button>
                         <button class="btn btn-sm btn-danger deduct-agent-btn" data-id="${agent.id}" data-name="${agent.name}">Deduct</button>
                         <button class="btn btn-sm btn-secondary view-logs-btn" data-id="${agent.id}" data-name="${agent.name}">Logs</button>
@@ -368,6 +381,12 @@
             document.querySelectorAll('.edit-agent-btn').forEach(btn => {
                 btn.addEventListener('click', function () {
                     editAgent(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-address'), this.getAttribute('data-phone'));
+                });
+            });
+
+            document.querySelectorAll('.transfer-balance-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    transferBalance(this.getAttribute('data-id'), this.getAttribute('data-name'), this.getAttribute('data-address'), this.getAttribute('data-balance'));
                 });
             });
 
@@ -481,7 +500,12 @@
                             <td><span class="log-type type-${log.transaction_type}">${log.transaction_type}</span></td>
                             <td><strong>${log.amount} ብር</strong></td>
                             <td>
-                                ${log.target_username ? `Transfer to <strong>${log.target_username}</strong>` : log.description}
+                                ${log.transaction_type === 'transfer' && log.target_username ?
+                            `Transfer to <strong>${log.target_username}</strong>` :
+                            log.target_username ?
+                                `${log.transaction_type === 'fund' ? 'Received from Admin' : 'Sent to'} <strong>${log.target_username}</strong>` :
+                                log.description || 'Manual adjustment by admin'
+                        }
                             </td>
                         </tr>
                     `).join('');
@@ -490,6 +514,189 @@
                 }
             } catch (error) {
                 showError('Error loading logs');
+            }
+        }
+
+        // Transfer Balance to User
+        async function transferBalance(agentId, agentName, agentAddress, agentBalance) {
+            // Create a modal dialog for transferring balance
+            const modalHtml = `
+                <div id="transferBalanceModal" style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
+                ">
+                    <div style="
+                        background: white;
+                        padding: 30px;
+                        border-radius: 10px;
+                        width: 90%;
+                        max-width: 600px;
+                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                    ">
+                        <h3 style="margin-top: 0; color: #333; text-align: center;">Transfer Balance to User</h3>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                            <strong>Agent:</strong> ${agentName}<br>
+                            <strong>Address:</strong> ${agentAddress || 'Not set'}<br>
+                            <strong>Available Balance:</strong> <span style="color: #28a745; font-weight: bold;">${agentBalance} ብር</span>
+                        </div>
+                        <form id="transferBalanceForm">
+                            <div style="margin-bottom: 20px;">
+                                <label for="targetUsername" style="display: block; margin-bottom: 5px; font-weight: bold;">Target Username:</label>
+                                <input type="text" id="targetUsername" placeholder="Enter exact username" required style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 1px solid #ddd;
+                                    border-radius: 5px;
+                                    font-size: 16px;
+                                    box-sizing: border-box;
+                                ">
+                                <small style="color: #666; font-style: italic;">User must have the same address as agent</small>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="transferAmount" style="display: block; margin-bottom: 5px; font-weight: bold;">Amount (ብር):</label>
+                                <input type="number" id="transferAmount" placeholder="Enter amount" min="1" max="${agentBalance}" step="1" required style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 1px solid #ddd;
+                                    border-radius: 5px;
+                                    font-size: 16px;
+                                    box-sizing: border-box;
+                                ">
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="transferDescription" style="display: block; margin-bottom: 5px; font-weight: bold;">Description (Optional):</label>
+                                <input type="text" id="transferDescription" placeholder="Transfer description" style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 1px solid #ddd;
+                                    border-radius: 5px;
+                                    font-size: 16px;
+                                    box-sizing: border-box;
+                                ">
+                            </div>
+                            <div id="transferMessage" class="message" style="margin-bottom: 15px;"></div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                <button type="button" id="cancelTransferBtn" style="
+                                    padding: 10px 20px;
+                                    border: 1px solid #ddd;
+                                    background: #f8f9fa;
+                                    color: #333;
+                                    border-radius: 5px;
+                                    cursor: pointer;
+                                    font-size: 16px;
+                                ">Cancel</button>
+                                <button type="submit" style="
+                                    padding: 10px 20px;
+                                    border: none;
+                                    background: #28a745;
+                                    color: white;
+                                    border-radius: 5px;
+                                    cursor: pointer;
+                                    font-size: 16px;
+                                ">Transfer Balance</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to page
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Handle form submission
+            document.getElementById('transferBalanceForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const targetUsername = document.getElementById('targetUsername').value.trim();
+                const amount = parseFloat(document.getElementById('transferAmount').value);
+                const description = document.getElementById('transferDescription').value.trim();
+
+                if (!targetUsername || !amount || amount <= 0) {
+                    showTransferMessage('Please fill in all required fields with valid values', 'error');
+                    return;
+                }
+
+                if (amount > parseFloat(agentBalance)) {
+                    showTransferMessage('Amount exceeds available balance', 'error');
+                    return;
+                }
+
+                try {
+                    showTransferMessage('Processing transfer...', 'info');
+
+                    const response = await apiRequest(`/admin/agents/${agentId}/transfer`, 'POST', {
+                        targetUsername: targetUsername,
+                        amount: amount,
+                        description: description || null
+                    });
+
+                    if (response.success) {
+                        showTransferMessage(response.message || 'Transfer completed successfully!', 'success');
+                        setTimeout(() => {
+                            closeTransferModal();
+                            loadAgents(); // Refresh the agent list
+                        }, 2000);
+                    } else {
+                        showTransferMessage(response.message || 'Transfer failed', 'error');
+                    }
+                } catch (error) {
+                    showTransferMessage('Error processing transfer', 'error');
+                }
+            });
+
+            // Handle cancel button
+            document.getElementById('cancelTransferBtn').addEventListener('click', closeTransferModal);
+
+            // Handle clicking outside modal
+            document.getElementById('transferBalanceModal').addEventListener('click', (e) => {
+                if (e.target.id === 'transferBalanceModal') {
+                    closeTransferModal();
+                }
+            });
+
+            function closeTransferModal() {
+                const modal = document.getElementById('transferBalanceModal');
+                if (modal) {
+                    modal.remove();
+                }
+            }
+
+            // Helper function to show messages in the transfer modal
+            function showTransferMessage(message, type) {
+                const element = document.getElementById('transferMessage');
+                if (element) {
+                    let bgColor, textColor, borderColor;
+                    switch (type) {
+                        case 'success':
+                            bgColor = '#d4edda';
+                            textColor = '#155724';
+                            borderColor = '#c3e6cb';
+                            break;
+                        case 'error':
+                            bgColor = '#f8d7da';
+                            textColor = '#721c24';
+                            borderColor = '#f5c6cb';
+                            break;
+                        case 'info':
+                            bgColor = '#d1ecf1';
+                            textColor = '#0c5460';
+                            borderColor = '#bee5eb';
+                            break;
+                        default:
+                            bgColor = '#f8f9fa';
+                            textColor = '#333';
+                            borderColor = '#ddd';
+                    }
+                    element.innerHTML = `<div style="padding: 10px; border-radius: 5px; background: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor};">${message}</div>`;
+                }
             }
         }
 

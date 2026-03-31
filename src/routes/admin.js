@@ -385,4 +385,164 @@ router.get('/agents/:id/transactions', verifyToken, (req, res) => {
     }
 });
 
+// Agent transfer balance to user (with address validation)
+router.post('/agents/:agentId/transfer', verifyToken, (req, res) => {
+    try {
+        const { agentId } = req.params;
+        const { targetUsername, amount, description } = req.body;
+
+        // Validate input
+        if (!targetUsername || !amount || isNaN(amount) || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid target username and positive amount are required'
+            });
+        }
+
+        // Get agent information
+        db.get('SELECT * FROM agents WHERE id = ? AND is_active = 1', [agentId], (err, agent) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+
+            if (!agent) {
+                return res.status(404).json({ success: false, message: 'Agent not found or inactive' });
+            }
+
+            // Check if agent has sufficient balance
+            if (agent.credit_balance < amount) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Insufficient agent balance'
+                });
+            }
+
+            // Get target user information
+            db.get('SELECT * FROM pending_users WHERE username = ?', [targetUsername], (userErr, targetUser) => {
+                if (userErr) {
+                    return res.status(500).json({ success: false, message: 'Database error' });
+                }
+
+                if (!targetUser) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Target user not found'
+                    });
+                }
+
+                // ADDRESS VALIDATION: Check if agent and user have the same address
+                const agentAddress = agent.address ? agent.address.trim().toLowerCase() : '';
+                const userAddress = targetUser.address ? targetUser.address.trim().toLowerCase() : '';
+
+                if (!agentAddress || !userAddress) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Both agent and user must have addresses set to perform transfers'
+                    });
+                }
+
+                if (agentAddress !== userAddress) {
+                    return res.status(403).json({
+                        success: false,
+                        message: `Transfer denied: Agent and user must be in the same location. Agent address: "${agent.address}", User address: "${targetUser.address}"`
+                    });
+                }
+
+                // All validations passed, proceed with transfer
+                db.serialize(() => {
+                    db.run('BEGIN TRANSACTION');
+
+                    // Deduct from agent balance
+                    db.run('UPDATE agents SET credit_balance = credit_balance - ? WHERE id = ?', 
+                        [parseFloat(amount), agentId], function(agentUpdateErr) {
+                        if (agentUpdateErr) {
+                            db.run('ROLLBACK');
+                            return res.status(500).json({ success: false, message: 'Failed to update agent balance' });
+                        }
+
+                        // Add to user balance (assuming user_balances table exists)
+                        db.run('INSERT OR REPLACE INTO user_balances (user_id, current_balance, last_updated) VALUES (?, COALESCE((SELECT current_balance FROM user_balances WHERE user_id = ?), 0) + ?, CURRENT_TIMESTAMP)',
+                            [targetUser.id, targetUser.id, parseFloat(amount)], function(userUpdateErr) {
+                            if (userUpdateErr) {
+                                // If user_balances table doesn't exist, try adding to user_packages instead
+                                console.log('⚠️ user_balances table not found, adding to user_packages');
+                            }
+                            
+                            // Always add to user_packages for agent transfers (for desktop app sync)
+                            db.run('INSERT INTO user_packages (user_id, amount, assigned_by, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+                                [targetUser.id, parseFloat(amount), `Agent Transfer from ${agent.name}`], function(packageErr) {
+                                
+                                if (userUpdateErr && packageErr) {
+                                    // Both operations failed
+                                    db.run('ROLLBACK');
+                                    return res.status(500).json({ success: false, message: 'Failed to update user balance' });
+                                }
+
+                                    // Log the transaction
+                                    db.run('INSERT INTO agent_transactions (agent_id, transaction_type, amount, target_user_id, description) VALUES (?, ?, ?, ?, ?)',
+                                        [agentId, 'transfer', parseFloat(amount), targetUser.id, description || `Transfer to ${targetUsername}`], function(logErr) {
+                                        if (logErr) {
+                                            db.run('ROLLBACK');
+                                            return res.status(500).json({ success: false, message: 'Failed to log transaction' });
+                                        }
+
+                                        // Commit transaction
+                                        db.run('COMMIT', (commitErr) => {
+                                            if (commitErr) {
+                                                return res.status(500).json({ success: false, message: 'Transaction commit failed' });
+                                            }
+
+                                            res.json({
+                                                success: true,
+                                                message: `Successfully transferred ${amount} ብር to ${targetUsername}`,
+                                                transaction: {
+                                                    agentId: agentId,
+                                                    targetUser: targetUsername,
+                                                    amount: parseFloat(amount),
+                                                    agentAddress: agent.address,
+                                                    userAddress: targetUser.address
+                                                }
+                                            });
+                                        });
+                                    });
+                                });
+                            } else {
+                                // Log the transaction
+                                db.run('INSERT INTO agent_transactions (agent_id, transaction_type, amount, target_user_id, description) VALUES (?, ?, ?, ?, ?)',
+                                    [agentId, 'transfer', parseFloat(amount), targetUser.id, description || `Transfer to ${targetUsername}`], function(logErr) {
+                                    if (logErr) {
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ success: false, message: 'Failed to log transaction' });
+                                    }
+
+                                    // Commit transaction
+                                    db.run('COMMIT', (commitErr) => {
+                                        if (commitErr) {
+                                            return res.status(500).json({ success: false, message: 'Transaction commit failed' });
+                                        }
+
+                                        res.json({
+                                            success: true,
+                                            message: `Successfully transferred ${amount} ብր to ${targetUsername}`,
+                                            transaction: {
+                                                agentId: agentId,
+                                                targetUser: targetUsername,
+                                                amount: parseFloat(amount),
+                                                agentAddress: agent.address,
+                                                userAddress: targetUser.address
+                                            }
+                                        });
+                                    });
+                                });
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;

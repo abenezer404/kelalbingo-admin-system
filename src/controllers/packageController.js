@@ -181,6 +181,7 @@ const syncBalance = async (req, res) => {
         SELECT 
           up.id,
           up.amount,
+          up.assigned_by,
           p.name as package_name
         FROM user_packages up
         LEFT JOIN packages p ON up.package_id = p.id
