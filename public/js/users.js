@@ -86,13 +86,14 @@ function displayUsers(users) {
         return;
     }
 
-    let html = '<table class="data-table"><thead><tr><th>Username</th><th>Address</th><th>Machine Serial</th><th>Current Balance</th><th>Pending Packages</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+    let html = '<table class="data-table"><thead><tr><th>Username</th><th>Address</th><th>Phone</th><th>Machine Serial</th><th>Current Balance</th><th>Pending Packages</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
 
     users.forEach(user => {
         const status = user.is_synced ? '<span class="badge badge-success">Synced</span>' : '<span class="badge badge-warning">Pending</span>';
         const createdAt = new Date(user.created_at).toLocaleString();
         const machineSerial = user.machine_serial || '<span style="color: #999;">Not registered</span>';
         const address = user.address || '<span style="color: #999;">N/A</span>';
+        const phone = user.phone || '<span style="color: #999;">N/A</span>';
         const currentBalance = user.current_balance || 0;
         const pendingBalance = user.pending_balance || 0;
         const balanceUpdated = user.balance_updated_at ? new Date(user.balance_updated_at).toLocaleString() : 'Never';
@@ -101,6 +102,7 @@ function displayUsers(users) {
           <tr>
             <td>${user.username}</td>
             <td>${address}</td>
+            <td>${phone}</td>
             <td>${machineSerial}</td>
             <td>
               <strong style="color: #667eea; font-size: 1.1em;">${currentBalance} ብር</strong>
@@ -110,7 +112,7 @@ function displayUsers(users) {
             <td>${createdAt}</td>
             <td>${status}</td>
             <td>
-              <button class="btn btn-primary btn-sm edit-user-btn" data-user-id="${user.id}" data-username="${user.username}" data-address="${user.address || ''}">Edit Address</button>
+              <button class="btn btn-primary btn-sm edit-user-btn" data-user-id="${user.id}" data-username="${user.username}" data-address="${user.address || ''}" data-phone="${user.phone || ''}">Edit Info</button>
               <button class="btn btn-warning btn-sm reset-password-btn" data-user-id="${user.id}" data-username="${user.username}">Reset Password</button>
               <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="${user.id}" data-username="${user.username}">Delete</button>
             </td>
@@ -127,7 +129,8 @@ function displayUsers(users) {
             const userId = this.getAttribute('data-user-id');
             const username = this.getAttribute('data-username');
             const address = this.getAttribute('data-address');
-            editUser(userId, username, address);
+            const phone = this.getAttribute('data-phone');
+            editUser(userId, username, address, phone);
         });
     });
 
@@ -200,7 +203,7 @@ async function deleteUser(id, username) {
     }
 }
 
-async function editUser(id, currentUsername, currentAddress) {
+async function editUser(id, currentUsername, currentAddress, currentPhone) {
     // Create a modal dialog for editing user data
     const modalHtml = `
         <div id="editUserModal" style="
@@ -223,7 +226,7 @@ async function editUser(id, currentUsername, currentAddress) {
                 max-width: 500px;
                 box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             ">
-                <h3 style="margin-top: 0; color: #333; text-align: center;">Edit User Address</h3>
+                <h3 style="margin-top: 0; color: #333; text-align: center;">Edit User Information</h3>
                 <form id="editUserForm">
                     <div style="margin-bottom: 20px;">
                         <label for="editUsername" style="display: block; margin-bottom: 5px; font-weight: bold;">Username:</label>
@@ -251,6 +254,18 @@ async function editUser(id, currentUsername, currentAddress) {
                             box-sizing: border-box;
                         ">
                     </div>
+                    <div style="margin-bottom: 20px;">
+                        <label for="editPhone" style="display: block; margin-bottom: 5px; font-weight: bold;">Phone Number:</label>
+                        <input type="tel" id="editPhone" value="${currentPhone || ''}" placeholder="Enter phone number (e.g., +251911234567)" style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #ddd;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            box-sizing: border-box;
+                        ">
+                        <small style="color: #666; font-style: italic;">Phone number will sync to user's device</small>
+                    </div>
                     <div id="editMessage" class="message" style="margin-bottom: 15px;"></div>
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
                         <button type="button" id="cancelEditBtn" style="
@@ -270,7 +285,7 @@ async function editUser(id, currentUsername, currentAddress) {
                             border-radius: 5px;
                             cursor: pointer;
                             font-size: 16px;
-                        ">Update Address</button>
+                        ">Update Information</button>
                     </div>
                 </form>
             </div>
@@ -285,14 +300,16 @@ async function editUser(id, currentUsername, currentAddress) {
         e.preventDefault();
 
         const newAddress = document.getElementById('editAddress').value.trim();
+        const newPhone = document.getElementById('editPhone').value.trim();
 
         try {
             const response = await apiRequest(`/admin/users/${id}`, 'PUT', {
-                address: newAddress || null
+                address: newAddress || null,
+                phone: newPhone || null
             });
 
             if (response.success) {
-                showMessage('editMessage', 'User address updated successfully!', 'success');
+                showMessage('editMessage', response.message || 'User information updated successfully!', 'success');
                 setTimeout(() => {
                     closeEditModal();
                     loadUsers(); // Refresh the user list

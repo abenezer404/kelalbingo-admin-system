@@ -94,7 +94,7 @@ const syncUser = async (req, res) => {
         username: user.username,
         password: password, // Return plain text password instead of hash
         address: userAddress,
-        phone: null, // Phone column doesn't exist in production, return null
+        phone: user.phone || null, // Include phone if column exists, null otherwise
         updated_at: user.created_at // Use created_at since updated_at doesn't exist in production
       }
     });
@@ -428,8 +428,10 @@ const checkUserUpdates = async (req, res) => {
             ? String(user.address).trim()
             : null;
 
-        // Phone column doesn't exist in production database
-        const userPhone = null;
+        // Include phone if column exists, null otherwise
+        const userPhone = user.phone !== undefined && user.phone !== null && user.phone !== ''
+            ? String(user.phone).trim()
+            : null;
 
         // For now, always indicate an update is available to ensure sync works
         // This can be optimized later when proper timestamp tracking is added
@@ -453,38 +455,66 @@ const checkUserUpdates = async (req, res) => {
         });
     }
 };
-// Update user data (address only - phone column doesn't exist in production)
+// Update user data (address and phone - username is read-only)
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { address, phone } = req.body;
 
-        // Only address can be updated - phone column doesn't exist in production database
+        // Only address and phone can be updated - username is read-only for security
         const trimmedAddress = address ? address.trim() : null;
+        const trimmedPhone = phone ? phone.trim() : null;
 
-        // Update only address field (phone column doesn't exist in production)
-        const updateSql = 'UPDATE pending_users SET address = ? WHERE id = ?';
+        // Try to update both address and phone, with fallback for missing phone column
+        const updateWithPhoneSql = 'UPDATE pending_users SET address = ?, phone = ? WHERE id = ?';
+        const updateAddressOnlySql = 'UPDATE pending_users SET address = ? WHERE id = ?';
 
-        db.run(updateSql, [trimmedAddress, id], function(err) {
-            if (err) {
+        // First try with phone column
+        db.run(updateWithPhoneSql, [trimmedAddress, trimmedPhone, id], function(err) {
+            if (err && err.message.includes('column "phone" of relation "pending_users" does not exist')) {
+                // Phone column doesn't exist, fallback to address only
+                console.log('⚠️ Phone column not found, updating address only');
+                
+                db.run(updateAddressOnlySql, [trimmedAddress, id], function(fallbackErr) {
+                    if (fallbackErr) {
+                        console.error('Database error updating user (fallback):', fallbackErr);
+                        return res.status(500).json({
+                            success: false,
+                            message: 'Database error'
+                        });
+                    }
+
+                    if (this.changes === 0) {
+                        return res.status(404).json({
+                            success: false,
+                            message: 'User not found'
+                        });
+                    }
+
+                    res.json({
+                        success: true,
+                        message: 'User address updated successfully (phone not supported)'
+                    });
+                });
+            } else if (err) {
                 console.error('Database error updating user:', err);
                 return res.status(500).json({
                     success: false,
                     message: 'Database error'
                 });
-            }
+            } else {
+                if (this.changes === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'User not found'
+                    });
+                }
 
-            if (this.changes === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
+                res.json({
+                    success: true,
+                    message: 'User information updated successfully'
                 });
             }
-
-            res.json({
-                success: true,
-                message: 'User address updated successfully'
-            });
         });
 
     } catch (error) {
