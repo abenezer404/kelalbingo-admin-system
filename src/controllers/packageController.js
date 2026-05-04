@@ -1,4 +1,5 @@
 const { db } = require('../config/database');
+const User = require('../models/User');
 
 /**
  * Get all packages
@@ -158,8 +159,29 @@ const syncBalance = async (req, res) => {
       });
     }
 
+    // Clean machine serial - remove padding characters
+    const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+    console.log(`🔍 Balance sync - Original serial: "${machineSerial}"`);
+    console.log(`🔍 Balance sync - Cleaned serial: "${cleanedSerial}"`);
+
+    // Try cleaned serial first, then original
+    let user = await User.getByUsernameAndSerial(username, cleanedSerial);
+    if (!user) {
+      console.log(`🔍 User not found with cleaned serial, trying original...`);
+      user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found for this machine'
+      });
+    }
+
+    console.log(`✅ User found for balance sync`);
+
     // Get user by username and machine serial
-    db.get('SELECT id, machine_serial FROM pending_users WHERE username = ? AND machine_serial = ?', [username, machineSerial], (err, user) => {
+    db.get('SELECT id, machine_serial FROM pending_users WHERE id = ?', [user.id], (err, userConfirm) => {
       if (err) {
         return res.status(500).json({
           success: false,
@@ -288,8 +310,29 @@ const reportBalance = async (req, res) => {
       });
     }
 
+    // Clean machine serial - remove padding characters
+    const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+    console.log(`🔍 Report balance - Original serial: "${machineSerial}"`);
+    console.log(`🔍 Report balance - Cleaned serial: "${cleanedSerial}"`);
+
+    // Try cleaned serial first, then original
+    let user = await User.getByUsernameAndSerial(username, cleanedSerial);
+    if (!user) {
+      console.log(`🔍 User not found with cleaned serial, trying original...`);
+      user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found for this machine'
+      });
+    }
+
+    console.log(`✅ User found for balance report`);
+
     // Get user by username and machine serial
-    db.get('SELECT id FROM pending_users WHERE username = ? AND machine_serial = ?', [username, machineSerial], (err, user) => {
+    db.get('SELECT id FROM pending_users WHERE id = ?', [user.id], (err, userConfirm) => {
       if (err) {
         return res.status(500).json({
           success: false,
