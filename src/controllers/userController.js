@@ -35,18 +35,29 @@ const syncUser = async (req, res) => {
       });
     }
 
-    // Get user from database by username + machine serial
-    // (ensures we return the correct address for the device)
-    const user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    // Clean machine serial - remove padding characters
+    const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+    console.log(`🔍 Login attempt - Original serial: "${machineSerial}"`);
+    console.log(`🔍 Login attempt - Cleaned serial: "${cleanedSerial}"`);
+
+    // Get user from database - try cleaned serial first, then original
+    let user = await User.getByUsernameAndSerial(username, cleanedSerial);
+    if (!user) {
+      console.log(`🔍 User not found with cleaned serial, trying original...`);
+      user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    }
 
     if (!user) {
       // Log failed attempt
-      logSync(null, ipAddress, 'no-device-check', false);
+      logSync(null, ipAddress, cleanedSerial, false);
       return res.status(404).json({
         success: false,
         message: 'User not found. Please contact administrator.'
       });
     }
+    
+    console.log(`✅ User found with serial matching`);
+
 
     // Check if expired
     if (user.expires_at) {
@@ -133,12 +144,21 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Get user from database by username and machine serial
-    const user = await User.getByUsernameAndSerial(username, machineSerial);
+    // Clean machine serial - remove padding characters
+    const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+    console.log(`🔍 Password reset - Original serial: "${machineSerial}"`);
+    console.log(`🔍 Password reset - Cleaned serial: "${cleanedSerial}"`);
+
+    // Get user from database - try cleaned serial first, then original
+    let user = await User.getByUsernameAndSerial(username, cleanedSerial);
+    if (!user) {
+      console.log(`🔍 User not found with cleaned serial, trying original...`);
+      user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    }
 
     if (!user) {
       // Log failed attempt
-      logPasswordReset(null, ipAddress, machineSerial, false);
+      logPasswordReset(null, ipAddress, cleanedSerial, false);
       return res.status(404).json({
         success: false,
         message: 'User not found for this machine. Please contact administrator.'
@@ -213,8 +233,18 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Check if username already exists on this machine serial
-    const existingUser = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    // Clean machine serial - remove padding characters (ÿ, null bytes, etc.)
+    const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+    console.log(`🔧 Original serial: "${machineSerial}"`);
+    console.log(`🔧 Cleaned serial: "${cleanedSerial}"`);
+
+    // Check if username already exists on this machine serial (check both cleaned and original)
+    let existingUser = await User.getByUsernameAndSerial(username, cleanedSerial);
+    if (!existingUser) {
+      // Also check with original serial in case it was already stored with padding
+      existingUser = await User.getByUsernameAndSerial(username, machineSerial.trim());
+    }
+    
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -233,11 +263,11 @@ const createUser = async (req, res) => {
       expiresAt = expiresAt.toISOString();
     }
 
-    // Create user with machine serial
+    // Create user with machine serial (use cleaned serial)
     const user = await User.createWithMachineSerial(
       username,
       passwordHash,
-      machineSerial.trim(),
+      cleanedSerial,
       expiresAt,
       address ? address.trim() : null
     );
@@ -248,7 +278,7 @@ const createUser = async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        machineSerial: machineSerial.trim()
+        machineSerial: cleanedSerial
       }
     });
   } catch (error) {
@@ -412,8 +442,14 @@ const checkUserUpdates = async (req, res) => {
             });
         }
 
-        // Get user from database
-        const user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+        // Clean machine serial - remove padding characters
+        const cleanedSerial = machineSerial.replace(/[ÿ\x00\xFF\u00FF]+$/g, '').trim();
+
+        // Get user from database - try cleaned serial first, then original
+        let user = await User.getByUsernameAndSerial(username, cleanedSerial);
+        if (!user) {
+            user = await User.getByUsernameAndSerial(username, machineSerial.trim());
+        }
 
         if (!user) {
             return res.status(404).json({
